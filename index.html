@@ -1378,6 +1378,21 @@ function pickNode(id){
   if(n.id!=='entry'&&!reach(id)){notify('Node not reachable yet','warn');return;}
   selNode=id;
   addLog('tlog',`$ select ${n.service} ${n.port}`,'tinfo');
+  if(n.status==='target'){
+    const exploitCost=Math.max(1,2-(G._exploitDiscount||0));
+    addLog('tlog',`TARGET LOCK ACQUIRED — breach required (EXPLOIT ${exploitCost} INT or BYPASS 2 FOCUS)`,'twarn');
+    if(intR>=exploitCost){
+      addLog('tlog','Auto-action: executing EXPLOIT on target node.','tok');
+      doExploit();
+      return;
+    }
+    if(focusR>=2){
+      addLog('tlog','Auto-action: executing BYPASS on target node.','tok');
+      doBypass();
+      return;
+    }
+    notify('Target selected, but not enough INT/FOCUS to breach.','warn');
+  }
   renderPuzzle();
 }
 
@@ -1399,6 +1414,7 @@ function doBypass(){
   if(!selNode){notify('Select a node','warn');return;}
   if(focusR<2){notify('Not enough FOCUS','err');return;}
   const n=hackNodes.find(x=>x.id===selNode);
+  if(!n||n.status==='done'){notify('Node already completed','warn');return;}
   focusR-=2;updRes();
   addLog('tlog',`$ bypass --reroute ${n.service}`,'twarn');
   n.status='done';
@@ -2031,6 +2047,7 @@ function doExploit(){
   const cost=Math.max(1,2-(G._exploitDiscount||0));
   if(intR<cost){notify(`Not enough INT (need ${cost})`,'err');return;}
   const n=hackNodes.find(x=>x.id===selNode);
+  if(!n||n.status==='done'){notify('Node already completed','warn');return;}
   // Zero-day lets you exploit secure nodes
   if(n.status==='secure'){
     if(G._zeroDays>0){
