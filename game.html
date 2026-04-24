@@ -1,0 +1,2037 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SYSTEM://ROOTKIT</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --green:#00ff9d;--gdim:#00cc7a;--gdark:#002a14;
+  --red:#ff3c5a;--rdim:#cc2040;
+  --amber:#ffaa00;--adim:#cc8800;
+  --blue:#00aaff;--purple:#cc88ff;
+  --bg:#06080a;--bg2:#0c1014;--bg3:#111820;--bg4:#161f28;
+  --brd:#162016;--brd2:#1e2e1e;--brd3:#243424;
+  --tx:#9ac09a;--txd:#3a5a3a;--txb:#c8e8c8;
+}
+html,body{width:100%;min-height:100vh;background:var(--bg);font-family:'Share Tech Mono',monospace;color:var(--tx);overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,0.05) 0,rgba(0,0,0,0.05) 1px,transparent 1px,transparent 3px);pointer-events:none;z-index:9998;}
+body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(0,255,157,0.03) 0%,transparent 70%);pointer-events:none;z-index:9997;}
+
+#wrap{max-width:840px;margin:0 auto;padding:14px;}
+.screen{display:none;}
+.screen.active{display:block;}
+
+/* NOTIFICATION */
+#notif{position:fixed;top:14px;right:14px;background:var(--bg2);border:1px solid var(--green);padding:10px 18px;font-size:11px;color:var(--green);border-radius:2px;z-index:10000;transform:translateX(300%);transition:transform 0.25s;max-width:300px;line-height:1.6;}
+#notif.show{transform:translateX(0);}
+#notif.warn{border-color:var(--amber);color:var(--amber);}
+#notif.err{border-color:var(--red);color:var(--red);}
+#notif.lore{border-color:var(--purple);color:var(--purple);}
+
+/* LORE POPUP */
+#lore-popup{position:fixed;inset:0;background:rgba(0,0,0,0.85);display:none;align-items:center;justify-content:center;z-index:9999;pointer-events:none;}
+#lore-popup.show{display:flex;pointer-events:all;}
+.lore-box{background:var(--bg2);border:1px solid var(--purple);max-width:520px;width:90%;padding:0;border-radius:3px;overflow:hidden;}
+.lore-hdr{background:var(--bg3);padding:10px 16px;border-bottom:1px solid var(--brd2);display:flex;justify-content:space-between;align-items:center;}
+.lore-hdr-title{font-size:10px;color:var(--purple);letter-spacing:2px;}
+.lore-hdr-close{font-size:11px;color:var(--txd);cursor:pointer;padding:2px 8px;border:1px solid var(--brd);border-radius:2px;}
+.lore-hdr-close:hover{color:var(--tx);}
+.lore-body{padding:18px 20px;}
+.lore-file{font-size:10px;color:var(--txd);margin-bottom:10px;letter-spacing:1px;}
+.lore-content{font-size:12px;color:var(--tx);line-height:1.9;}
+.lore-content .redacted{background:var(--rdim);color:var(--rdim);border-radius:1px;user-select:none;}
+.lore-content .highlight{color:var(--amber);}
+.lore-content .danger{color:var(--red);}
+.lore-footer{padding:10px 20px 16px;font-size:10px;color:var(--txd);}
+
+/* HUD */
+#hud{display:none;justify-content:space-between;align-items:center;padding:8px 14px;background:var(--bg2);border:1px solid var(--brd);border-bottom:1px solid var(--gdark);margin-bottom:12px;border-radius:2px;flex-wrap:wrap;gap:8px;}
+.hs{font-size:11px;color:var(--txd);}
+.hs span{font-weight:bold;}
+.hs.g span{color:var(--green);}
+.hs.a span{color:var(--amber);}
+.hs.b span{color:var(--blue);}
+.hs.r span{color:var(--red);}
+.hs.p span{color:var(--purple);}
+
+/* BUTTONS */
+.btn{font-family:'Share Tech Mono',monospace;font-size:12px;padding:9px 22px;background:transparent;border:1px solid var(--green);color:var(--green);cursor:pointer;letter-spacing:2px;border-radius:2px;transition:all 0.18s;}
+.btn:hover{background:rgba(0,255,157,0.07);}
+.btn.red{border-color:var(--red);color:var(--red);}
+.btn.red:hover{background:rgba(255,60,90,0.07);}
+.btn.amb{border-color:var(--amber);color:var(--amber);}
+.btn.amb:hover{background:rgba(255,170,0,0.07);}
+.btn.pur{border-color:var(--purple);color:var(--purple);}
+.btn.pur:hover{background:rgba(204,136,255,0.07);}
+
+/* SCREEN TITLE */
+.stitle{font-family:'Orbitron',monospace;font-size:13px;color:var(--green);letter-spacing:3px;margin-bottom:14px;padding-bottom:9px;border-bottom:1px solid var(--brd2);}
+
+/* PANELS */
+.panel{background:var(--bg2);border:1px solid var(--brd);border-radius:2px;margin-bottom:10px;}
+.phdr{font-size:9px;color:var(--txd);letter-spacing:3px;padding:7px 12px;border-bottom:1px solid var(--brd);background:var(--bg3);}
+.pbody{padding:14px;}
+
+/* BRIEF */
+.brief{background:var(--bg2);border:1px solid var(--brd);border-left:3px solid var(--amber);padding:12px 16px;margin-bottom:12px;border-radius:0 2px 2px 0;}
+.brief h4{font-size:9px;color:var(--amber);letter-spacing:3px;margin-bottom:6px;}
+.brief p{font-size:11px;color:var(--txd);line-height:1.7;}
+
+/* CITY */
+.cgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
+.card{background:var(--bg2);border:1px solid var(--brd);padding:14px 12px;cursor:pointer;border-radius:2px;transition:all 0.18s;position:relative;overflow:hidden;}
+.card:hover:not(.locked){border-color:var(--green);background:var(--bg3);}
+.card.locked{opacity:0.3;cursor:not-allowed;}
+.card-icon{font-size:22px;margin-bottom:8px;}
+.card-name{font-size:11px;color:var(--txb);letter-spacing:1px;margin-bottom:4px;}
+.card-desc{font-size:10px;color:var(--txd);line-height:1.5;}
+.badge{position:absolute;top:8px;right:8px;font-size:8px;padding:2px 7px;border-radius:2px;}
+.bg{background:rgba(0,255,157,0.1);color:var(--green);border:1px solid rgba(0,255,157,0.2);}
+.br{background:rgba(255,60,90,0.08);color:var(--red);border:1px solid rgba(255,60,90,0.18);}
+.ba{background:rgba(255,170,0,0.08);color:var(--amber);border:1px solid rgba(255,170,0,0.18);}
+.bp{background:rgba(204,136,255,0.08);color:var(--purple);border:1px solid rgba(204,136,255,0.18);}
+
+/* APPROACH */
+.agrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.acard{background:var(--bg3);border:1px solid var(--brd);padding:14px 12px;cursor:pointer;border-radius:2px;transition:all 0.18s;}
+.acard:hover{border-color:var(--gdim);}
+.acard h4{font-size:10px;letter-spacing:1px;margin-bottom:8px;}
+.acard p{font-size:10px;color:var(--txd);line-height:1.5;}
+.acard .acost{font-size:9px;margin-top:10px;padding-top:8px;border-top:1px solid var(--brd);color:var(--txd);}
+
+/* NODE PUZZLE */
+.res-row{display:flex;gap:18px;margin-bottom:14px;flex-wrap:wrap;}
+.res{font-size:11px;display:flex;align-items:center;gap:6px;}
+.res-lbl{color:var(--txd);}
+.rbar{width:65px;height:5px;background:var(--bg);border:1px solid var(--brd);border-radius:2px;overflow:hidden;}
+.rfill{height:100%;border-radius:1px;transition:width 0.3s;}
+.rf-t{background:var(--blue);}
+.rf-i{background:var(--green);}
+.rf-f{background:var(--amber);}
+.rval{color:var(--txb);min-width:16px;font-size:11px;}
+
+.ncanvas{position:relative;width:100%;height:230px;background:var(--bg);border:1px solid var(--brd);border-radius:2px;overflow:hidden;margin-bottom:12px;}
+.node{position:absolute;width:118px;background:var(--bg2);border:1px solid var(--brd2);border-radius:2px;padding:8px 10px;cursor:pointer;transition:border-color 0.15s,box-shadow 0.15s;font-size:10px;user-select:none;}
+.node:hover:not(.nd):not(.done){border-color:rgba(0,255,157,0.4);}
+.nact{border-color:var(--green) !important;box-shadow:0 0 8px rgba(0,255,157,0.12);}
+.n-entry:not(.done){animation:ndPulse 1.5s ease-in-out infinite;}
+@keyframes ndPulse{0%,100%{box-shadow:0 0 4px rgba(0,255,157,0.1);}50%{box-shadow:0 0 14px rgba(0,255,157,0.35);border-color:rgba(0,255,157,0.5);}}
+.done{border-color:var(--gdark) !important;opacity:0.5;cursor:default;}
+.nsec{border-color:rgba(255,60,90,0.35) !important;}
+.ntgt{border-color:rgba(255,170,0,0.45) !important;}
+.nd{opacity:0.2;cursor:not-allowed !important;}
+.nport{color:var(--green);font-size:9px;margin-bottom:2px;}
+.nsvc{color:var(--txb);font-size:11px;margin-bottom:2px;}
+.nstat{font-size:9px;}
+.sv{color:var(--amber);}.ss{color:var(--red);}.so{color:var(--green);}.st{color:var(--amber);}.sd{color:var(--txd);}
+.esvg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
+
+.arow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.ab{font-family:'Share Tech Mono',monospace;font-size:11px;padding:8px 15px;background:var(--bg3);border:1px solid var(--brd);color:var(--txd);cursor:pointer;border-radius:2px;transition:all 0.18s;}
+.ab:hover:not(:disabled){border-color:var(--green);color:var(--green);}
+.ab:disabled{opacity:0.2;cursor:not-allowed;}
+.ab.abg{border-color:rgba(0,255,157,0.3);color:var(--green);}
+
+.tlog{background:var(--bg);border:1px solid var(--brd);padding:10px 14px;font-size:11px;line-height:1.8;max-height:115px;overflow-y:auto;border-radius:2px;}
+.tl{color:var(--txd);}
+.tok{color:var(--green);}
+.twarn{color:var(--amber);}
+.terr{color:var(--red);}
+.tinfo{color:var(--blue);}
+.tlore{color:var(--purple);}
+.tcrit{color:var(--amber);font-weight:bold;font-size:13px;letter-spacing:1px;}
+.tbighit{color:var(--red);font-weight:bold;font-size:13px;}
+
+/* DUNGEON */
+.dhdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.dtitle{font-family:'Orbitron',monospace;font-size:12px;color:var(--red);letter-spacing:3px;}
+.rdots{display:flex;gap:5px;}
+.rd{width:30px;height:5px;border-radius:2px;background:var(--bg3);border:1px solid var(--brd);transition:all 0.3s;}
+.rddone{background:var(--gdark);border-color:var(--gdim);}
+.rdcur{background:rgba(255,170,0,0.2);border-color:var(--amber);}
+
+.arena{background:var(--bg2);border:1px solid var(--brd);border-radius:2px;padding:16px;margin-bottom:10px;}
+.fighters{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px;}
+.fbox{width:43%;}
+.fname{font-size:10px;color:var(--txd);letter-spacing:1px;margin-bottom:5px;}
+.fname.en{text-align:right;color:var(--red);}
+.hpwrap{height:8px;background:var(--bg);border:1px solid var(--brd);border-radius:2px;overflow:hidden;margin-bottom:4px;}
+.hpfill{height:100%;border-radius:1px;transition:width 0.35s;}
+.hfp{background:var(--green);}
+.hfe{background:var(--red);}
+.hptxt{font-size:10px;color:var(--txd);}
+.hptxt.rt{text-align:right;}
+.vstxt{font-family:'Orbitron',monospace;font-size:18px;color:var(--brd2);align-self:center;}
+.spr{font-size:50px;text-align:center;margin:6px 0;}
+.sprp{text-align:left;}
+
+.rmods{font-size:10px;color:var(--txd);margin-bottom:10px;line-height:1.9;}
+.mt{display:inline-block;font-size:9px;padding:2px 8px;border-radius:2px;margin:2px;}
+.mtg{background:rgba(0,255,157,0.08);color:var(--green);border:1px solid rgba(0,255,157,0.18);}
+.mtr{background:rgba(255,60,90,0.06);color:var(--red);border:1px solid rgba(255,60,90,0.15);}
+.mta{background:rgba(255,170,0,0.06);color:var(--amber);border:1px solid rgba(255,170,0,0.15);}
+.mtp{background:rgba(204,136,255,0.06);color:var(--purple);border:1px solid rgba(204,136,255,0.15);}
+
+.ecard{background:var(--bg3);border:1px solid var(--brd);padding:8px 14px;margin-bottom:10px;font-size:10px;border-radius:2px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;}
+.ect{color:var(--red);}
+.ecw{color:var(--amber);}
+.ecb{color:var(--purple);}
+.eca{color:var(--txd);}
+
+/* REWARD */
+#reward{padding:20px 10px;text-align:center;}
+.rtitle{font-family:'Orbitron',monospace;font-size:20px;color:var(--green);letter-spacing:5px;margin-bottom:6px;}
+.rsub{font-size:11px;color:var(--txd);margin-bottom:22px;}
+.rpath{background:var(--bg2);border:1px solid var(--brd);border-left:3px solid var(--green);padding:12px 16px;border-radius:0 2px 2px 0;margin-bottom:14px;font-size:11px;color:var(--txd);line-height:1.8;text-align:left;}
+.lore-drop{background:var(--bg2);border:1px solid var(--purple);border-left:3px solid var(--purple);padding:12px 16px;border-radius:0 2px 2px 0;margin-bottom:18px;font-size:11px;color:var(--txd);line-height:1.8;text-align:left;cursor:pointer;}
+.lore-drop:hover{background:var(--bg3);}
+.lore-drop h4{font-size:9px;color:var(--purple);letter-spacing:2px;margin-bottom:6px;}
+.ritems{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:22px;}
+.ritem{background:var(--bg2);border:1px solid var(--brd);padding:14px 10px;border-radius:2px;}
+.riico{font-size:24px;margin-bottom:8px;}
+.riname{font-size:9px;color:var(--txd);margin-bottom:5px;letter-spacing:1px;}
+.rival{font-size:14px;font-weight:bold;}
+.rig{color:var(--green);}.ria{color:var(--amber);}.rib{color:var(--blue);}
+
+/* BANK */
+.bank-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;}
+.bstat{background:var(--bg3);border:1px solid var(--brd);padding:14px 12px;border-radius:2px;text-align:center;}
+.bstat-label{font-size:9px;color:var(--txd);letter-spacing:2px;margin-bottom:8px;}
+.bstat-val{font-size:20px;font-weight:bold;}
+.bstat-val.green{color:var(--green);}
+.bstat-val.amber{color:var(--amber);}
+.bstat-val.blue{color:var(--blue);}
+.bank-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.bank-form{background:var(--bg2);border:1px solid var(--brd);padding:14px;border-radius:2px;}
+.bank-form h4{font-size:9px;color:var(--txd);letter-spacing:2px;margin-bottom:10px;}
+.bank-input-row{display:flex;gap:8px;align-items:center;}
+.bank-input{font-family:'Share Tech Mono',monospace;font-size:13px;background:var(--bg);border:1px solid var(--brd2);color:var(--txb);padding:8px 10px;border-radius:2px;width:100%;outline:none;}
+.bank-input:focus{border-color:var(--green);}
+.bank-btn{font-family:'Share Tech Mono',monospace;font-size:11px;padding:8px 14px;background:transparent;border:1px solid var(--green);color:var(--green);cursor:pointer;border-radius:2px;white-space:nowrap;transition:all 0.18s;}
+.bank-btn:hover{background:rgba(0,255,157,0.07);}
+.bank-btn.amb{border-color:var(--amber);color:var(--amber);}
+.bank-btn.amb:hover{background:rgba(255,170,0,0.07);}
+.bank-history{background:var(--bg);border:1px solid var(--brd);padding:10px 14px;font-size:10px;line-height:1.9;max-height:100px;overflow-y:auto;border-radius:2px;}
+.bh-line{color:var(--txd);}
+.bh-dep{color:var(--green);}
+.bh-with{color:var(--amber);}
+.bh-loss{color:var(--red);}
+
+/* BLACK MARKET */
+.market-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px;}
+.mitem{background:var(--bg2);border:1px solid var(--brd);padding:14px 12px;border-radius:2px;position:relative;transition:all 0.18s;}
+.mitem:hover:not(.owned):not(.cantafford){border-color:var(--blue);background:var(--bg3);}
+.mitem.owned{border-color:var(--gdark);opacity:0.6;}
+.mitem.cantafford{opacity:0.45;}
+.mitem-icon{font-size:24px;margin-bottom:8px;}
+.mitem-name{font-size:11px;color:var(--txb);letter-spacing:1px;margin-bottom:4px;}
+.mitem-desc{font-size:10px;color:var(--txd);line-height:1.5;margin-bottom:10px;}
+.mitem-cost{font-size:10px;color:var(--blue);margin-bottom:8px;}
+.mitem-effect{font-size:9px;color:var(--green);padding:3px 8px;background:rgba(0,255,157,0.07);border:1px solid rgba(0,255,157,0.15);border-radius:2px;display:inline-block;}
+.mitem-owned-tag{font-size:9px;color:var(--gdim);padding:3px 8px;background:var(--gdark);border-radius:2px;display:inline-block;}
+.mitem-buy{font-family:'Share Tech Mono',monospace;font-size:10px;padding:6px 12px;background:transparent;border:1px solid var(--blue);color:var(--blue);cursor:pointer;border-radius:2px;margin-top:8px;display:block;width:100%;transition:all 0.18s;letter-spacing:1px;}
+.mitem-buy:hover:not(:disabled){background:rgba(0,170,255,0.07);}
+.mitem-buy:disabled{opacity:0.3;cursor:not-allowed;}
+.crypto-warning{background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.2);padding:10px 14px;border-radius:2px;font-size:10px;color:var(--amber);margin-bottom:14px;line-height:1.6;}
+
+/* DIALOGUE */
+#dialogue{position:fixed;inset:0;background:rgba(4,6,8,0.97);display:none;flex-direction:column;justify-content:flex-end;z-index:600;padding:20px;pointer-events:none;}
+#dialogue.show{display:flex;pointer-events:all;}
+.dlg-scene{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;padding-bottom:20px;cursor:pointer;}
+.dlg-scene-txt{font-size:11px;color:var(--txd);letter-spacing:2px;text-align:center;}
+.dlg-speaker-wrap{display:flex;align-items:flex-end;gap:16px;margin-bottom:12px;}
+.dlg-avatar{width:64px;height:64px;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:36px;background:var(--bg2);border:1px solid var(--brd);flex-shrink:0;}
+.dlg-avatar.right{order:2;}
+.dlg-name{font-size:9px;letter-spacing:3px;margin-bottom:5px;}
+.dlg-box{background:var(--bg2);border:1px solid var(--brd2);border-radius:2px;padding:16px 18px;max-width:600px;width:100%;}
+.dlg-box.self{border-color:var(--gdim);border-left:3px solid var(--green);}
+.dlg-box.other{border-color:var(--brd2);border-left:3px solid var(--amber);}
+.dlg-box.system{border-color:var(--purple);border-left:3px solid var(--purple);background:rgba(204,136,255,0.04);}
+.dlg-box.narrate{border:none;background:transparent;text-align:center;padding:8px;}
+.dlg-text{font-size:14px;line-height:1.9;color:var(--tx);}
+.dlg-text.narrate{color:var(--txb);font-size:15px;line-height:2;text-align:center;}
+.dlg-text.system-msg{color:var(--purple);}
+.dlg-choices{display:flex;flex-direction:column;gap:8px;margin-top:10px;}
+.dlg-choice{font-family:'Share Tech Mono',monospace;font-size:12px;padding:10px 16px;background:var(--bg3);border:1px solid var(--brd2);color:var(--txd);cursor:pointer;border-radius:2px;text-align:left;transition:all 0.15s;letter-spacing:1px;}
+.dlg-choice:hover{border-color:var(--green);color:var(--green);}
+.dlg-continue{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--txd);letter-spacing:3px;text-align:right;margin-top:10px;cursor:pointer;padding:8px 0;}
+.dlg-continue:hover{color:var(--tx);}
+.dlg-progress{display:flex;gap:4px;justify-content:center;margin-bottom:16px;}
+.dlg-dot{width:20px;height:3px;background:var(--brd);border-radius:2px;}
+.dlg-dot.done{background:var(--gdim);}
+.dlg-dot.cur{background:var(--green);}
+@keyframes flicker{0%,97%,100%{opacity:1;}98%{opacity:0.5;}}
+
+.college-identity{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.identity-card{background:var(--bg2);border:1px solid var(--brd);padding:14px;border-radius:2px;text-align:center;}
+.identity-card.active-style{border-color:var(--green);}
+.identity-card h4{font-size:10px;letter-spacing:2px;margin-bottom:6px;}
+.identity-card p{font-size:10px;color:var(--txd);line-height:1.5;}
+.identity-card .istats{font-size:11px;margin-top:8px;color:var(--txb);}
+
+.perk-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px;}
+.perk-card{background:var(--bg2);border:1px solid var(--brd);padding:14px 12px;border-radius:2px;position:relative;transition:all 0.18s;}
+.perk-card:hover:not(.pk-owned):not(.pk-locked){border-color:var(--green);background:var(--bg3);}
+.perk-card.pk-owned{border-color:var(--gdark);}
+.perk-card.pk-locked{opacity:0.35;}
+.pk-icon{font-size:20px;margin-bottom:8px;}
+.pk-name{font-size:11px;color:var(--txb);letter-spacing:1px;margin-bottom:4px;}
+.pk-desc{font-size:10px;color:var(--txd);line-height:1.5;margin-bottom:8px;}
+.pk-cost{font-size:9px;color:var(--amber);margin-bottom:8px;}
+.pk-req{font-size:9px;color:var(--red);margin-bottom:6px;}
+.pk-effect{font-size:9px;color:var(--green);padding:2px 8px;background:rgba(0,255,157,0.06);border:1px solid rgba(0,255,157,0.15);border-radius:2px;display:inline-block;margin-bottom:8px;}
+.pk-owned-tag{font-size:9px;color:var(--gdim);padding:2px 8px;background:var(--gdark);border-radius:2px;display:inline-block;}
+.pk-buy{font-family:'Share Tech Mono',monospace;font-size:10px;padding:6px 12px;background:transparent;border:1px solid var(--green);color:var(--green);cursor:pointer;border-radius:2px;width:100%;transition:all 0.18s;letter-spacing:1px;}
+.pk-buy:hover:not(:disabled){background:rgba(0,255,157,0.07);}
+.pk-buy:disabled{opacity:0.25;cursor:not-allowed;}
+.college-instructor{background:var(--bg2);border:1px solid var(--brd);border-left:3px solid var(--purple);padding:12px 16px;margin-bottom:14px;border-radius:0 2px 2px 0;font-size:11px;color:var(--txd);line-height:1.7;}
+.college-instructor span{color:var(--purple);}
+
+/* COMBAT COOLDOWNS */
+.cd-bar{display:inline-block;width:100%;height:3px;background:var(--bg);border-radius:2px;margin-top:4px;overflow:hidden;}
+.cd-fill{height:100%;background:var(--green);border-radius:2px;transition:width 0.3s;}
+.ab.on-cooldown{opacity:0.4;cursor:not-allowed;border-color:var(--brd)!important;color:var(--txd)!important;}
+.guard-bar-wrap{margin-bottom:8px;display:none;}
+.guard-label{font-size:9px;color:var(--blue);margin-bottom:3px;letter-spacing:1px;}
+.guard-bar{height:5px;background:var(--bg);border:1px solid var(--brd);border-radius:2px;overflow:hidden;}
+.guard-fill{height:100%;background:var(--blue);border-radius:1px;transition:width 0.35s;}
+</style>
+</head>
+<body>
+<div id="notif"></div>
+
+<!-- LORE POPUP -->
+<div id="lore-popup">
+  <div class="lore-box">
+    <div class="lore-hdr">
+      <span class="lore-hdr-title" id="lore-title">ENCRYPTED FILE</span>
+      <span class="lore-hdr-close" onclick="closeLore()">[ CLOSE ]</span>
+    </div>
+    <div class="lore-body">
+      <div class="lore-file" id="lore-filename">FILE: unknown</div>
+      <div class="lore-content" id="lore-content"></div>
+    </div>
+    <div class="lore-footer" id="lore-footer"></div>
+  </div>
+</div>
+
+<!-- DIALOGUE OVERLAY (outside wrap — overlays everything) -->
+<div id="dialogue">
+  <div class="dlg-scene" id="dlg-scene-area" onclick="dlgSceneClick()"></div>
+  <div class="dlg-progress" id="dlg-dots"></div>
+  <div id="dlg-speaker-wrap" class="dlg-speaker-wrap">
+    <div class="dlg-avatar" id="dlg-avatar-l"></div>
+    <div style="flex:1">
+      <div class="dlg-name" id="dlg-name"></div>
+      <div class="dlg-box" id="dlg-box">
+        <div class="dlg-text" id="dlg-text"></div>
+        <div class="dlg-choices" id="dlg-choices"></div>
+      </div>
+    </div>
+  </div>
+  <div class="dlg-continue" id="dlg-continue" onclick="dlgNext()">[ CONTINUE → ]</div>
+</div>
+
+<div id="wrap">
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hs g">ID: <span id="h-id">USER_47</span></div>
+  <div class="hs g">STR <span id="h-str">3</span></div>
+  <div class="hs g">INT <span id="h-int">5</span></div>
+  <div class="hs a">CASH <span id="h-money">47</span></div>
+  <div class="hs g">BANK <span id="h-bank">0</span></div>
+  <div class="hs b">◆ <span id="h-crypto">0</span></div>
+  <div class="hs r">REP <span id="h-rep">0</span></div>
+  <div class="hs p">FILES <span id="h-files">0</span></div>
+</div>
+
+<!-- BOOT -->
+<div id="boot" class="screen active">
+  <div style="text-align:center;padding:48px 20px;">
+    <div style="font-family:'Orbitron',monospace;font-size:30px;color:var(--green);letter-spacing:6px;margin-bottom:6px;animation:flicker 4s infinite">SYSTEM://ROOTKIT</div>
+    <div style="font-size:9px;color:var(--txd);letter-spacing:8px;margin-bottom:38px;">UNAUTHORIZED SESSION DETECTED</div>
+    <div class="tlog" id="boot-log" style="max-height:180px;text-align:left;margin-bottom:26px;"></div>
+    <button class="btn" id="start-btn" style="display:none" onclick="startGame()">[ BEGIN ]</button>
+  </div>
+</div>
+
+<!-- CITY -->
+<div id="city" class="screen">
+  <div class="stitle">// STELPORT — SECTOR 01</div>
+  <div class="cgrid">
+    <div class="card" onclick="goHome()">
+      <div class="card-icon">🏠</div>
+      <div class="card-name">MOM'S BASEMENT</div>
+      <div class="card-desc">Home base. Terminal. Punching bag. Your only safe space.</div>
+      <span class="badge bg">HOME</span>
+    </div>
+    <div class="card" onclick="doJob()">
+      <div class="card-icon">💼</div>
+      <div class="card-name">HELPDESK TEMP</div>
+      <div class="card-desc">Reset passwords. $85/shift. Numbing but steady.</div>
+      <span class="badge bg">WORK</span>
+    </div>
+    <div class="card" onclick="doGym()">
+      <div class="card-icon">🥊</div>
+      <div class="card-name">IRON DISTRICT GYM</div>
+      <div class="card-desc">Daily grind. STR +1 per session. $20. Free punching bag at home too.</div>
+      <span class="badge ba">TRAIN</span>
+    </div>
+    <div class="card" onclick="goDojo()">
+      <div class="card-icon">🥋</div>
+      <div class="card-name">IRON DISTRICT DOJO</div>
+      <div class="card-desc">Sensei Okoro's fight school. Combat techniques, guard stances, combo drills. Cash only.</div>
+      <span class="badge br">FIGHTER</span>
+    </div>
+    <div class="card" id="laundry-card" onclick="selectMission('laundromat')">
+      <div class="card-icon">🧺</div>
+      <div class="card-name">SUDZ LAUNDROMAT</div>
+      <div class="card-desc" id="laundry-desc">Go to Community College first — Marcus has a lead.</div>
+      <span class="badge br" id="laundry-badge">LOCKED</span>
+    </div>
+    <div class="card" id="warehouse-card" onclick="selectMission('warehouse')">
+      <div class="card-icon">🏭</div>
+      <div class="card-name">PORTSIDE WAREHOUSE</div>
+      <div class="card-desc" id="warehouse-desc">Clear the laundromat first. Something bigger is running through there.</div>
+      <span class="badge br" id="warehouse-badge">LOCKED</span>
+    </div>
+    <div class="card" id="clinic-card" onclick="selectMission('clinic')">
+      <div class="card-icon">🏥</div>
+      <div class="card-name">VALE STREET CLINIC</div>
+      <div class="card-desc" id="clinic-desc">Clear the warehouse first. The logs point here next.</div>
+      <span class="badge br" id="clinic-badge">LOCKED</span>
+    </div>
+    <div class="card" id="neoncard" onclick="selectMission('neon')">
+      <div class="card-icon">🔬</div>
+      <div class="card-name">NEXAGEN BIOMETRICS</div>
+      <div class="card-desc" id="neon-desc">Clear the clinic first. Every thread leads here.</div>
+      <span class="badge br" id="neon-badge">LOCKED</span>
+    </div>
+    <div class="card" onclick="goBank()">
+      <div class="card-icon">🏦</div>
+      <div class="card-name">STELPORT CREDIT UNION</div>
+      <div class="card-desc">Deposit cash to keep it safe. Withdraw when you need it. Money on you is at risk.</div>
+      <span class="badge bg">BANK</span>
+    </div>
+    <div class="card" onclick="goMarket()">
+      <div class="card-icon">🕶️</div>
+      <div class="card-name">THE DARKNET STALL</div>
+      <div class="card-desc">Black market. Exploits, weapons, tools. Crypto only. No questions asked.</div>
+      <span class="badge" style="background:rgba(0,170,255,0.1);color:var(--blue);border:1px solid rgba(0,170,255,0.2);">◆ CRYPTO</span>
+    </div>
+    <div class="card" onclick="goCollege()">
+      <div class="card-icon">📚</div>
+      <div class="card-name">STELPORT COMM. COLLEGE</div>
+      <div class="card-desc">Night classes. Prof. Vasquez. Hacking perks and hybrid theory. Cash only.</div>
+      <span class="badge bg">HACKER</span>
+    </div>
+    <div class="card locked">
+      <div class="card-icon">🌆</div>
+      <div class="card-name">NEON CITY — S2</div>
+      <div class="card-desc">Clear Act 1 (4 missions) to unlock next district.</div>
+      <span class="badge br">LOCKED</span>
+    </div>
+  </div>
+</div>
+
+<!-- HOME -->
+<div id="home" class="screen">
+  <div class="stitle">// MOM'S BASEMENT</div>
+  <div class="brief">
+    <h4>SYSTEM NOTIFICATION</h4>
+    <p id="home-brief">$47 to your name. Three months behind on rent. The ROOTKIT framework just activated on your machine — and it's flagging something nearby. Marcus texted. He's at the community college, Room 14B. He says he has a lead.<br><br><span style="color:var(--amber)">→ Head to Community College.</span></p>
+  </div>
+  <div class="cgrid">
+    <div class="card" onclick="doRest()">
+      <div class="card-icon">🛏️</div><div class="card-name">REST</div>
+      <div class="card-desc">Restore HP, stims, focus. Resets daily actions. Free.</div>
+      <span class="badge bg">FREE</span>
+    </div>
+    <div class="card" onclick="doTerminal()">
+      <div class="card-icon">💻</div><div class="card-name">TERMINAL</div>
+      <div class="card-desc">Practice sessions. INT +1. Check darkweb boards. (once/day)</div>
+      <span class="badge bg">FREE</span>
+    </div>
+    <div class="card" onclick="doBag()">
+      <div class="card-icon">🥊</div><div class="card-name">PUNCHING BAG</div>
+      <div class="card-desc">Slow STR training. +1 STR. Free. (once/day)</div>
+      <span class="badge bg">FREE</span>
+    </div>
+  </div>
+  <button class="btn" onclick="showCity()">[ BACK TO MAP ]</button>
+</div>
+
+<!-- HACK -->
+<div id="hack" class="screen">
+  <div class="stitle" id="hack-title">// INTRUSION SEQUENCE</div>
+  <div class="brief"><h4>MISSION INTEL</h4><p id="hack-brief">Loading...</p></div>
+  <div class="panel">
+    <div class="phdr">SELECT APPROACH — YOUR CHOICE MODIFIES THE DUNGEON</div>
+    <div class="pbody"><div class="agrid" id="agrid"></div></div>
+  </div>
+  <div id="puzz-wrap" style="display:none">
+    <div class="panel">
+      <div class="phdr">NETWORK TOPOLOGY — NODE TRAVERSAL ACTIVE</div>
+      <div class="pbody">
+        <div class="res-row">
+          <div class="res"><span class="res-lbl">TRACE</span><div class="rbar"><div class="rfill rf-t" id="rt" style="width:100%"></div></div><span class="rval" id="rtv">10</span></div>
+          <div class="res"><span class="res-lbl">INT</span><div class="rbar"><div class="rfill rf-i" id="ri" style="width:100%"></div></div><span class="rval" id="riv">10</span></div>
+          <div class="res"><span class="res-lbl">FOCUS</span><div class="rbar"><div class="rfill rf-f" id="rf" style="width:100%"></div></div><span class="rval" id="rfv">10</span></div>
+        </div>
+        <div class="ncanvas" id="ncanvas"><svg class="esvg" id="esvg"></svg></div>
+        <div class="arow">
+          <button class="ab abg" onclick="doScan()" id="bscan">SCAN [-1 TRACE]</button>
+          <button class="ab" onclick="doExploit()" id="bexploit">EXPLOIT [-2 INT]</button>
+          <button class="ab" onclick="doBypass()" id="bbypass">BYPASS [-2 FOCUS]</button>
+        </div>
+        <div class="tlog" id="tlog"><div class="tl tinfo">$ rootkit --connect target</div><div class="tl">Select a node to begin...</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DUNGEON -->
+<div id="dungeon" class="screen">
+  <div class="dhdr">
+    <div class="dtitle" id="dtitle">// BREACH</div>
+    <div class="rdots" id="rdots"></div>
+  </div>
+  <div class="rmods" id="rmods"></div>
+  <div class="ecard" id="ecard" style="display:none"></div>
+  <div class="arena">
+    <div class="fighters">
+      <div class="fbox">
+        <div class="spr sprp">🧑‍💻</div>
+        <div class="fname">YOU</div>
+        <div class="hpwrap"><div class="hpfill hfp" id="php" style="width:100%"></div></div>
+        <div class="hptxt" id="pht">100/100</div>
+      </div>
+      <div class="vstxt">VS</div>
+      <div class="fbox">
+        <div class="spr" id="espr">💀</div>
+        <div class="fname en" id="ename">ENEMY</div>
+        <div class="hpwrap"><div class="hpfill hfe" id="ehp" style="width:100%"></div></div>
+        <div class="hptxt rt" id="eht">50/50</div>
+      </div>
+    </div>
+    <div class="guard-bar-wrap" id="guard-wrap">
+      <div class="guard-label">GUARD (damage reduction active)</div>
+      <div class="guard-bar"><div class="guard-fill" id="guard-fill" style="width:0%"></div></div>
+    </div>
+    <div class="tlog" id="clog" style="max-height:85px"><div class="tl twarn">--- Combat initialized ---</div></div>
+  </div>
+  <div class="arow" id="cactions">
+    <button class="ab abg" id="btn-punch" onclick="doPunch()">
+      PUNCH [8-14]<div class="cd-bar"><div class="cd-fill" id="cd-punch" style="width:100%"></div></div>
+    </button>
+    <button class="ab" id="btn-kick" onclick="doKick()">
+      KICK [14-20]<div class="cd-bar"><div class="cd-fill" id="cd-kick" style="width:100%"></div></div>
+    </button>
+    <button class="ab" id="bspecial" onclick="doSpecial()">
+      EXPLOIT WEAK<div class="cd-bar"><div class="cd-fill" id="cd-special" style="width:100%"></div></div>
+    </button>
+    <button class="ab" id="btn-guard" onclick="doGuard()">
+      GUARD [-50% DMG]<div class="cd-bar"><div class="cd-fill" id="cd-guard" style="width:100%"></div></div>
+    </button>
+    <button class="ab" style="border-color:rgba(255,170,0,0.3);color:var(--amber)" onclick="doStim()">STIM (+HP)</button>
+  </div>
+</div>
+
+<!-- REWARD -->
+<div id="reward" class="screen">
+  <div class="rtitle">MISSION COMPLETE</div>
+  <div class="rsub" id="rsub">Dungeon cleared.</div>
+  <div class="rpath" id="rpath"></div>
+  <div class="lore-drop" id="lore-drop" onclick="showLoreFromDrop()" style="display:none">
+    <h4>⚠ ENCRYPTED FILE RECOVERED — CLICK TO DECRYPT</h4>
+    <p id="lore-drop-preview">Unknown file intercepted from target network...</p>
+  </div>
+  <div class="ritems" id="ritems"></div>
+  <button class="btn" onclick="showCity()">[ RETURN TO MAP ]</button>
+</div>
+<!-- COLLEGE -->
+<div id="college" class="screen">
+  <div class="stitle">// STELPORT COMMUNITY COLLEGE — NIGHT DIVISION</div>
+  <div class="college-instructor">
+    <span>Prof. Vasquez</span> leans back, coffee cup labeled "DEFINITELY NOT WINE." She glances at your screen. "You're not here for credits. Good. The ones who want credits end up in IT support." She slides a folder across the desk. "Pick what you need. And if anyone asks — this is Intro to Networking."
+  </div>
+  <div class="panel"><div class="phdr">YOUR BUILD</div><div class="pbody"><div class="college-identity" id="college-identity"></div></div></div>
+  <div class="panel"><div class="phdr">AVAILABLE COURSES — HACKER + HYBRID TRACKS</div><div class="pbody"><div class="perk-grid" id="perk-grid"></div></div></div>
+  <div class="panel"><div class="phdr">ACTIVE PERKS</div><div class="pbody"><div id="active-perks" style="font-size:11px;color:var(--txd);line-height:1.9;">No perks unlocked yet.</div></div></div>
+  <button class="btn" onclick="showCity()">[ BACK TO MAP ]</button>
+</div>
+
+<!-- DOJO -->
+<div id="dojo" class="screen">
+  <div class="stitle">// IRON DISTRICT DOJO</div>
+  <div class="college-instructor" style="border-left-color:var(--red)">
+    <span style="color:var(--red)">Sensei Okoro</span> doesn't look up from wrapping his hands. "Gym builds the body. This place builds the fighter." He finally looks at you. "You want to hit harder, take less damage, outlast your enemies — that costs more than twenty bucks and a punch bag. You ready to actually train?"
+  </div>
+  <div class="panel"><div class="phdr">YOUR BUILD</div><div class="pbody"><div class="college-identity" id="dojo-identity"></div></div></div>
+  <div class="panel"><div class="phdr">AVAILABLE TRAINING — FIGHTER TRACK</div><div class="pbody"><div class="perk-grid" id="dojo-perk-grid"></div></div></div>
+  <div class="panel"><div class="phdr">ACTIVE TECHNIQUES</div><div class="pbody"><div id="dojo-active-perks" style="font-size:11px;color:var(--txd);line-height:1.9;">No techniques unlocked yet.</div></div></div>
+  <button class="btn" onclick="showCity()">[ BACK TO MAP ]</button>
+</div>
+
+<!-- BANK -->
+<div id="bank" class="screen">
+  <div class="stitle">// STELPORT CREDIT UNION</div>
+  <div class="brief">
+    <h4>RISK MANAGEMENT</h4>
+    <p>Cash on your person is lost if you're defeated in a dungeon. Deposited funds are safe. Withdraw before missions to cover stims and gear. Smart operators keep their reserves banked.</p>
+  </div>
+  <div class="bank-summary">
+    <div class="bstat"><div class="bstat-label">CASH ON HAND</div><div class="bstat-val amber" id="bank-cash">$0</div></div>
+    <div class="bstat"><div class="bstat-label">BANKED (SAFE)</div><div class="bstat-val green" id="bank-saved">$0</div></div>
+    <div class="bstat"><div class="bstat-label">CRYPTO WALLET</div><div class="bstat-val blue" id="bank-crypto">◆0</div></div>
+  </div>
+  <div class="bank-actions">
+    <div class="bank-form">
+      <h4>DEPOSIT CASH →BANK</h4>
+      <div class="bank-input-row">
+        <input class="bank-input" type="number" id="dep-amt" placeholder="amount" min="1">
+        <button class="bank-btn" onclick="doDeposit()">DEPOSIT</button>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:6px;">
+        <button class="bank-btn" style="font-size:9px;padding:5px 10px" onclick="depositQuick(0.25)">25%</button>
+        <button class="bank-btn" style="font-size:9px;padding:5px 10px" onclick="depositQuick(0.5)">50%</button>
+        <button class="bank-btn" style="font-size:9px;padding:5px 10px" onclick="depositQuick(1)">ALL</button>
+      </div>
+    </div>
+    <div class="bank-form">
+      <h4>WITHDRAW BANK →CASH</h4>
+      <div class="bank-input-row">
+        <input class="bank-input" type="number" id="with-amt" placeholder="amount" min="1">
+        <button class="bank-btn amb" onclick="doWithdraw()">WITHDRAW</button>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:6px;">
+        <button class="bank-btn amb" style="font-size:9px;padding:5px 10px" onclick="withdrawQuick(0.25)">25%</button>
+        <button class="bank-btn amb" style="font-size:9px;padding:5px 10px" onclick="withdrawQuick(0.5)">50%</button>
+        <button class="bank-btn amb" style="font-size:9px;padding:5px 10px" onclick="withdrawQuick(1)">ALL</button>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="phdr">TRANSACTION HISTORY</div>
+    <div class="pbody" style="padding:0">
+      <div class="bank-history" id="bank-history">
+        <div class="bh-line">No transactions yet.</div>
+      </div>
+    </div>
+  </div>
+  <button class="btn" onclick="showCity()">[ BACK TO MAP ]</button>
+</div>
+
+<!-- BLACK MARKET -->
+<div id="market" class="screen">
+  <div class="stitle">// THE DARKNET STALL</div>
+  <div class="crypto-warning">
+    ⚠ CRYPTO ONLY — Cash not accepted here. Earn crypto by completing missions and dungeons. Crypto is never lost on death — it stays in your wallet regardless.
+  </div>
+  <div class="market-grid" id="market-grid"></div>
+  <div class="panel">
+    <div class="phdr">EQUIPPED / OWNED</div>
+    <div class="pbody">
+      <div id="equipped-list" style="font-size:11px;color:var(--txd);line-height:1.9;">Nothing equipped yet.</div>
+    </div>
+  </div>
+  <button class="btn" onclick="showCity()">[ BACK TO MAP ]</button>
+</div>
+
+</div>
+
+<script>
+const G={
+  str:3,int:5,money:47,bank:0,crypto:0,rep:0,
+  php:100,phmax:100,ehp:0,ehmax:0,
+  stims:2,bagUsed:false,termUsed:false,
+  mission:null,approach:null,
+  bossWeak:false,roomIdx:0,rooms:[],roomRew:[],
+  filesFound:0,missionsCleared:0,
+  pendingLore:null,
+  owned:{},bankLog:[],
+  // story flags
+  story:{
+    introSeen:false,
+    metMarcus:false,
+    laundryUnlocked:false,
+    warehouseUnlocked:false,
+    clinicUnlocked:false,
+    neonUnlocked:false,
+    collegeVisited:false,
+    puzzleTutorialSeen:false,
+  }
+};
+
+// ── DIALOGUE ENGINE ────────────────────────────────────────────
+let dlgScript=[], dlgIdx=0, dlgOnEnd=null;
+
+// node types: {type:'narrate'|'line'|'choice', speaker, avatar, text, side, choices:[{text,next}], boxStyle}
+function runDialogue(script, onEnd){
+  dlgScript=script; dlgIdx=0; dlgOnEnd=onEnd;
+  document.getElementById('dialogue').classList.add('show');
+  dlgRender();
+}
+
+function dlgRender(){
+  if(dlgIdx>=dlgScript.length){dlgEnd();return;}
+  const node=dlgScript[dlgIdx];
+  const box=$id('dlg-box');
+  const txt=$id('dlg-text');
+  const name=$id('dlg-name');
+  const avatarL=$id('dlg-avatar-l');
+  const cont=$id('dlg-continue');
+  const choices=$id('dlg-choices');
+  const scene=$id('dlg-scene-area');
+  const speakerWrap=$id('dlg-speaker-wrap');
+
+  // progress dots
+  const dots=$id('dlg-dots');
+  dots.innerHTML='';
+  dlgScript.forEach((_,i)=>{
+    const d=document.createElement('div');
+    d.className='dlg-dot'+(i<dlgIdx?' done':i===dlgIdx?' cur':'');
+    dots.appendChild(d);
+  });
+
+  choices.innerHTML='';
+  scene.innerHTML='';
+
+  if(node.type==='narrate'){
+    speakerWrap.style.display='none';
+    scene.innerHTML=`<div class="dlg-box narrate" style="max-width:560px;cursor:pointer"><div class="dlg-text narrate">${node.text}</div><div style="font-size:9px;color:var(--txd);text-align:right;margin-top:12px;letter-spacing:2px">[ CLICK TO CONTINUE ]</div></div>`;
+    cont.style.display='none'; // scene area is the click target for narrate
+    return;
+  }
+
+  speakerWrap.style.display='flex';
+
+  if(node.type==='system'){
+    avatarL.textContent='⚡';
+    name.textContent='SYSTEM://ROOTKIT';
+    name.style.color='var(--purple)';
+    box.className='dlg-box system';
+    txt.className='dlg-text system-msg';
+    txt.innerHTML=node.text;
+    cont.style.display='block';
+    cont.textContent='[ CONTINUE → ]';
+    return;
+  }
+
+  avatarL.textContent=node.avatar||'👤';
+  name.textContent=node.speaker||'';
+  name.style.color=node.side==='self'?'var(--green)':'var(--amber)';
+  box.className='dlg-box '+(node.side==='self'?'self':'other');
+  txt.className='dlg-text';
+  txt.innerHTML=node.text;
+
+  if(node.type==='choice'){
+    cont.style.display='none';
+    node.choices.forEach(c=>{
+      const btn=document.createElement('button');
+      btn.className='dlg-choice';
+      btn.textContent=c.text;
+      btn.onclick=()=>{
+        if(c.flag)G.story[c.flag]=true;
+        if(typeof c.next==='number'){dlgIdx=c.next;dlgRender();}
+        else dlgNext();
+      };
+      choices.appendChild(btn);
+    });
+  } else {
+    cont.style.display='block';
+    cont.textContent='[ CONTINUE → ]';
+  }
+}
+
+function dlgSceneClick(){
+  // clicking the scene area advances narrate nodes
+  if(dlgIdx<dlgScript.length && dlgScript[dlgIdx].type==='narrate') dlgNext();
+}
+
+function dlgNext(){
+  dlgIdx++;
+  dlgRender();
+}
+
+function dlgEnd(){
+  $id('dialogue').classList.remove('show');
+  if(dlgOnEnd)dlgOnEnd();
+}
+
+// ── INTRO SEQUENCE ─────────────────────────────────────────────
+const INTRO_SCRIPT=[
+  {type:'narrate', text:'Stelport, 2031. Neon on the skyline. Rust underneath.'},
+  {type:'narrate', text:'Three months ago, you caught your manager at TechBridge IT funneling customer biometrics to a company called <span style="color:var(--amber)">NEXAGEN</span>. You reported it. HR fired you the same day.'},
+  {type:'narrate', text:'$47 in your account. Mom\'s basement. The ceiling fan clicks on every third rotation. You\'ve been counting.'},
+  {type:'line', speaker:'MOM', avatar:'👩', side:'other',
+    text:'Marcus called. Again. Night class at the college. He wants you there. I\'m not going to beg — but you sitting down here in the dark isn\'t helping either of us.'},
+  {type:'narrate', text:'You\'re about to close the laptop. Then the screen goes white. Then green.'},
+  {type:'system',
+    text:'SYSTEM://ROOTKIT — ACCESS GRANTED<br><br>USER_47 — SESSION INITIALIZED<br><br>Scanning local network...<br><span style="color:var(--amber)">Anomaly: encrypted traffic — 3 nodes within 400m.</span><br>Origin: <span style="color:var(--red)">NEXAGEN BIOMETRICS CORP.</span><br><br>The same company. Right here in your neighborhood.'},
+  {type:'line', speaker:'YOU', avatar:'🧑‍💻', side:'self',
+    text:'...I\'ll go to Marcus\'s class.'},
+];
+
+// ── COLLEGE INTRO (MARCUS SCENE) ───────────────────────────────
+const MARCUS_INTRO_SCRIPT=[
+  {type:'narrate', text:'Stelport Community College — Room 14B.<br><br>Night division. Half the fluorescents are dead. The whiteboard still has last semester\'s notes on it.'},
+  {type:'line', speaker:'MARCUS', avatar:'🧑‍🦱', side:'other',
+    text:'You actually showed up. I was about to bet against it. You look like you haven\'t slept in a week, by the way.'},
+  {type:'line', speaker:'YOU', avatar:'🧑‍💻', side:'self',
+    text:'Something happened tonight. A framework I\'ve never seen just activated on my machine. It\'s mapping every network in range — and it keeps flagging the same name. Nexagen.'},
+  {type:'line', speaker:'MARCUS', avatar:'🧑‍🦱', side:'other',
+    text:'Nexagen. Alright, this is going to sound weird — you know the laundromat on Vale Street? Sudz? My sister works the counter on Thursdays.'},
+  {type:'line', speaker:'YOU', avatar:'🧑‍💻', side:'self',
+    text:'What about it?'},
+  {type:'line', speaker:'MARCUS', avatar:'🧑‍🦱', side:'other',
+    text:'She started noticing things. Guys coming in, not with laundry — with cash. Corporate-volume transfers running through a machine that still has a Windows XP sticker on it. One receipt had <span style="color:var(--amber)">NEXAGEN BIOMETRICS</span> printed right on it.'},
+  {type:'line', speaker:'YOU', avatar:'🧑‍💻', side:'self',
+    text:'That\'s the company that got me fired. I reported them for selling customer data and they buried me for it.'},
+  {type:'line', speaker:'MARCUS', avatar:'🧑‍🦱', side:'other',
+    text:'Then maybe you should find out what they\'re really moving through there. Whatever it is, it\'s running through that laundromat\'s network — and that network is ancient.'},
+  {type:'line', speaker:'PROF. VASQUEZ', avatar:'👩‍🏫', side:'other',
+    text:'I couldn\'t help overhearing. That laundromat\'s router firmware hasn\'t been updated since 2009. Their firewall is consumer-grade, and their CUPS print service is still running 1.4. If you know what you\'re doing, that\'s not a wall — it\'s a welcome mat.'},
+  {type:'choice', speaker:'YOU', avatar:'🧑‍💻', side:'self',
+    text:'So you\'re both telling me to hack a laundromat.',
+    choices:[
+      {text:'Alright. Walk me through what I\'m looking at.', flag:'laundryUnlocked'},
+      {text:'This is probably a terrible idea. Let\'s do it.', flag:'laundryUnlocked'},
+    ]},
+  {type:'system',
+    text:'QUEST UNLOCKED: <span style="color:var(--green)">SUDZ LAUNDROMAT</span><br><br>Infiltrate the network at Sudz Laundry Services LLC.<br>Trace any connection to NEXAGEN BIOMETRICS.<br><br><span style="color:var(--amber)">Choose your approach: stealth hack, brute force, or OSINT first.</span>'},
+  {type:'narrate', text:'Marcus leans back, arms crossed, trying not to look impressed that you\'re actually doing this.<br><br>Vasquez has already turned back to her whiteboard.<br><br>For the first time in three months, you have a direction.'},
+];
+
+// ── PUZZLE TUTORIAL ────────────────────────────────────────────
+const PUZZLE_TUTORIAL_SCRIPT=[
+  {type:'system',
+    text:'<span style="color:var(--green);font-size:14px">ROOTKIT NETWORK SCANNER</span><br><br>You\'re looking at the target\'s network. Each box is a <span style="color:var(--amber)">node</span> — a service running on their system.<br><br>Start with the blinking entry node on the left. Click it to select it.'},
+  {type:'system',
+    text:'Node colors tell you what you\'re dealing with:<br><br><span style="color:var(--green)">[OPEN]</span> — accessible, start here<br><span style="color:var(--amber)">[VULN]</span> — has a vulnerability you can EXPLOIT<br><span style="color:var(--red)">[SECURE]</span> — hardened, you need to BYPASS it<br><span style="color:var(--amber)">[TARGET]</span> — your goal. Reach this to gain access.'},
+  {type:'system',
+    text:'Your three actions:<br><br><span style="color:var(--blue)">SCAN</span> — check what a node is (costs 1 TRACE)<br><span style="color:var(--green)">EXPLOIT</span> — hack a vulnerable node (costs 2 INT)<br><span style="color:var(--amber)">BYPASS</span> — route around hardened nodes (costs 2 FOCUS)<br><br>Click a node → pick your action → work toward the <span style="color:var(--amber)">TARGET</span>.'},
+];
+
+// ── STARTGAME + SCENE TRIGGERS ─────────────────────────────────
+function startGame(){
+  runDialogue(INTRO_SCRIPT, ()=>{
+    G.story.introSeen=true;
+    updateHUD();
+    show('home');
+    // show a system notification nudging them to college
+    setTimeout(()=>notify('SYSTEM: Marcus texted — "Still at the college. Room 14B." Go to Community College.','lore'),800);
+  });
+}
+
+
+const MARKET_ITEMS=[
+  {
+    id:'exploit_kit',icon:'💾',name:'EXPLOIT KIT v2',
+    desc:'Upgraded exploit scripts. Reduces INT cost of EXPLOIT action by 1.',
+    cost:40,effect:'+1 EXPLOIT efficiency (INT cost: 2→1)',
+    apply:()=>{G._exploitDiscount=1;}
+  },
+  {
+    id:'zero_day',icon:'🔓',name:'ZERO-DAY BUNDLE',
+    desc:'Three pre-loaded zero-days. Lets you exploit HARDENED (secure) nodes once.',
+    cost:80,effect:'Can exploit secure nodes (3 uses)',
+    apply:()=>{G._zeroDays=3;}
+  },
+  {
+    id:'brass_knuckles',icon:'🥊',name:'BRASS KNUCKLES',
+    desc:'Adds raw impact to every punch. Increases PUNCH damage by +8.',
+    cost:50,effect:'PUNCH DMG +8',
+    apply:()=>{G._punchBonus=8;}
+  },
+  {
+    id:'carbon_baton',icon:'⚡',name:'CARBON BATON',
+    desc:'Conducts electricity on impact. KICK damage +10, chance to stun.',
+    cost:70,effect:'KICK DMG +10',
+    apply:()=>{G._kickBonus=10;}
+  },
+  {
+    id:'signal_jammer',icon:'📡',name:'SIGNAL JAMMER',
+    desc:'Scrambles drone comms. All drone-type enemies deal 30% less damage.',
+    cost:60,effect:'Drone enemies: -30% damage',
+    apply:()=>{G._jammerActive=true;}
+  },
+  {
+    id:'focus_stim_pack',icon:'💉',name:'STIM PACK x3',
+    desc:'Three military-grade focus stims. Restores 40 HP each. One-time purchase.',
+    cost:35,effect:'+3 stims (40HP each, one-time)',
+    apply:()=>{G.stims+=3;G._stimHeal=40;}
+  },
+  {
+    id:'ghost_protocol',icon:'👻',name:'GHOST PROTOCOL',
+    desc:'Passive stealth layer. Stealth missions start with +3 bonus TRACE.',
+    cost:90,effect:'STEALTH approach: +3 TRACE',
+    apply:()=>{G._ghostProtocol=true;}
+  },
+  {
+    id:'neural_chip',icon:'🧠',name:'NEURAL INTERFACE CHIP',
+    desc:'Black market augmentation. INT +2 permanently. Side effects unknown.',
+    cost:120,effect:'INT +2 (permanent)',
+    apply:()=>{G.int+=2;}
+  },
+];
+
+// ── LORE DATABASE ──────────────────────────────────────────────
+const LORE={
+  laundromat:{
+    title:'RECOVERED FILE — LAUNDROMAT NODE',
+    filename:'FILE: /var/log/clients_ENC.dat  [PARTIAL DECRYPT]',
+    content:`Transaction log — <span class="highlight">SUDZ LAUNDRY SERVICES LLC</span>\n\nDate: 03/14 — $12,400 cash deposit — Client: <span class="redacted">████████████</span>\nDate: 03/15 — $8,200 wire transfer — Memo: <span class="highlight">"SUBJECT TRANSPORT FEE"</span>\nDate: 03/16 — $31,000 — Origin: <span class="redacted">████████</span> MEDICAL\nDate: 03/17 — $4,100 — Client: VALE STREET CLINIC\n\n[FRAGMENT] — Biometric processing batch: <span class="highlight">7 subjects</span>\n[FRAGMENT] — Next transfer: <span class="danger">NEXAGEN BIOMETRICS</span> — Pending\n\n<span class="redacted">██ subjects confirmed delivery. Non-compliant batch flagged for ████████████.</span>`,
+    footer:'NOTE: "Subject transport fee" and "biometric processing" don\'t belong in a laundry ledger.'
+  },
+  warehouse:{
+    title:'INTERCEPTED COMMS — WAREHOUSE NODE',
+    filename:'FILE: /opt/secure/comm_fragment.log',
+    content:`[CHANNEL: PRIV-7] Encrypted exchange — partial decode\n\nSENDER: <span class="highlight">V1P3R</span>\nRCVR: <span class="redacted">████</span>@nexagen.corp\n\n"Batch 4 delivered. Condition: <span class="danger">2 non-viable, 5 viable</span>."\n"Payment confirmed. NEXAGEN handling from here."\n"What about the ones who didn't make it?"\n"<span class="danger">Standard protocol. No record.</span>"\n\n---\n\nAttachment: biometric_scan_batch4.enc [<span class="highlight">UNREADABLE — KEY MISSING</span>]\nTimestamp: 4 days ago\n\n[SYS LOG] File access by root — <span class="danger">then immediately wiped</span>. Recovery partial only.`,
+    footer:'VIPER is moving people. NEXAGEN is the destination. Someone is covering tracks.'
+  },
+  clinic:{
+    title:'PATIENT DATABASE — VALE CLINIC',
+    filename:'FILE: /db/patient_records_corrupted.sql  [RECOVERY ATTEMPT]',
+    content:`Recovered patient records — <span class="highlight">VALE STREET WALK-IN CLINIC</span>\n\nRecord 4471 — DOB: 1998 — Status: <span class="danger">TRANSFERRED</span> — Destination: <span class="redacted">████████</span>\nRecord 4472 — DOB: 2001 — Status: <span class="danger">TRANSFERRED</span> — Destination: <span class="redacted">████████</span>\nRecord 4473 — DOB: 1997 — Last visit: <span class="highlight">BIOMETRIC SCREENING</span> — <span class="danger">FILE DELETED</span>\nRecord 4479 — DOB: 1999 — Flagged: <span class="highlight">HIGH COMPATIBILITY SCORE</span> — Transferred\n\n[NOTE IN RECORD] "Patient was not informed of transfer purpose."\n[NOTE IN RECORD] "Compatibility for <span class="danger">PROGRAM V</span> — CONFIRMED"\n\nDr. signature field: <span class="redacted">████████████</span>\n\n<span class="danger">48 records show "TRANSFERRED" status. 0 show a receiving facility name.</span>`,
+    footer:'PROGRAM V. High compatibility. Transferred without consent. This clinic is a sorting facility.'
+  },
+  neon:{
+    title:'CLASSIFIED RESEARCH — NEXAGEN BIOMETRICS',
+    filename:'FILE: /classified/program_V_summary.enc  [DECRYPTED]',
+    content:`NEXAGEN BIOMETRICS — <span class="danger">PROGRAM VECTOR</span> — INTERNAL SUMMARY\nCLASSIFICATION: EYES ONLY\n\nObjective: Human augmentation via <span class="highlight">synthetic neural mesh + adrenal override</span>.\nPhase 1: Subject sourcing. (COMPLETE — 200+ subjects)\nPhase 2: <span class="highlight">Compatibility screening.</span> (Clinic network — ONGOING)\nPhase 3: <span class="danger">Integration procedure.</span> (Lab Sector 7 — ACTIVE)\n\nSuccess rate: <span class="danger">34%</span>\nFailure outcome: <span class="redacted">████████████████████████</span>\n\n[NOTE] Failed subjects exhibit:\n— Elevated aggression\n— Loss of higher cognition\n— <span class="danger">Uncontrolled physical enhancement</span>\n\nSubject classification post-failure: <span class="danger">CONTAINMENT REQUIRED</span>\n\n[FINAL LINE — PARTIALLY CORRUPTED]\n"The ROOTKIT signal was never meant to be found. Whoever triggered it is now a <span class="highlight">VARIABLE</span> in the program."\n\n<span class="danger">You triggered it.</span>`,
+    footer:'This is what the monsters are. This is why you were chosen. Act 2 begins.'
+  }
+};
+
+// ── MISSIONS ───────────────────────────────────────────────────
+const MISSIONS={
+  laundromat:{
+    name:'SUDZ LAUNDROMAT',
+    brief:"Data laundering front. Router firmware from 2009. Cardholder data in plaintext. Routine takedown — or so it seems. The transaction logs reference 'subjects' and a company called NEXAGEN.",
+    dungeonTitle:'// LAUNDROMAT BACKROOM',
+    nodes:[
+      {id:'entry',port:':80',service:'HTTP',status:'open',x:5,y:38,to:['router','printer']},
+      {id:'router',port:':22',service:'SSH DAEMON',status:'vuln',x:30,y:12,to:['fw']},
+      {id:'printer',port:':9100',service:'CUPS 1.4.6',status:'vuln',x:30,y:62,to:['fw']},
+      {id:'fw',port:'fw-01',service:'iptables',status:'secure',x:57,y:38,to:['admin']},
+      {id:'admin',port:':8080',service:'ADMIN PANEL',status:'target',x:80,y:38,to:[]},
+    ],
+    roomNarration:[
+      'The back door swings open and you\'re standing in a storage room full of humming machines and cheap detergent.\n\nA guard leans against the far wall, arms crossed, already watching you.\n\nThis isn\'t the first time someone\'s looked at you like that. Growing up on Harding Avenue, fights found you whether you wanted them or not. You took Muay Thai for three years after that.\n\nYou\'re not a fighter by choice — you\'re a fighter by necessity.',
+    ],
+    enemies:{
+      stealth:[
+        {name:'DOZING GUARD',hp:30,maxHp:30,spr:'💂',dmg:[4,7],weak:null,rew:{m:90,c:25}},
+        {name:'BOSS: SHIFT MANAGER',hp:55,maxHp:55,spr:'🤵',dmg:[7,12],weak:null,rew:{m:140,c:45},
+         intro:'The back office door opens and the shift manager steps out. He looks normal at first — polo shirt, name tag, coffee stain on his sleeve.\n\nBut then he moves. Too smooth. Too precise. His eyes don\'t scan the room the way a normal person\'s do. They lock onto you instantly, like a sensor acquiring a target.\n\n"You shouldn\'t be back here," he says. His voice is flat. Not angry. Not nervous. Just certain.',
+         storyBeat:'He hits the floor hard. You stand over him, catching your breath.\n\nThen you see it — behind his left ear, a small circular scar. Clean. Surgical. Recent.\n\nYour ROOTKIT pings before you can process it: BIOMETRIC ANOMALY DETECTED. Signature matches encrypted records from the target network.\n\nThis guy isn\'t just a laundromat manager. Somebody put hardware in his head. And somebody stationed him here to watch over whatever\'s running through this place.'},
+      ],
+      loud:[
+        {name:'SECURITY GUARD',hp:45,maxHp:45,spr:'💂',dmg:[7,12],weak:null,rew:{m:70,c:18}},
+        {name:'ENFORCER',hp:55,maxHp:55,spr:'👊',dmg:[9,14],weak:null,rew:{m:90,c:22}},
+        {name:'BOSS: SHIFT MANAGER',hp:75,maxHp:75,spr:'🤵',dmg:[10,16],weak:null,rew:{m:155,c:55},
+         intro:'The shift manager is already moving when you come through the door.\n\nNot retreating — advancing. His stance is wrong for a civilian. Feet shoulder-width, weight centered, hands loose at his sides like someone who\'s done this professionally.\n\nHis pupils are dilated even in the fluorescent light. Something chemical is keeping him steady.\n\n"Nexagen sends their regards," he says. Then he swings.',
+         storyBeat:'You barely put him down. Standing over him, breathing hard, you notice it — the scar behind his ear. Surgical. Same shape as the marks in those patient records Marcus\'s sister mentioned.\n\nHe was one of them. A subject. A successful one.\n\nYour ROOTKIT flashes: BIOMETRIC SIGNATURE MATCH — PROGRAM VECTOR.\n\nWhatever that program is — it made this guy into something more than a shift manager.'},
+      ],
+      exploit:[
+        {name:'CONFUSED GUARD',hp:25,maxHp:25,spr:'😕',dmg:[3,7],weak:null,rew:{m:85,c:28}},
+        {name:'BOSS: SHIFT MANAGER',hp:42,maxHp:42,spr:'🤵',dmg:[6,10],weak:'exploit',rew:{m:190,c:70},
+         intro:'The ROOTKIT already mapped him before the door opened.\n\nAugmented adrenal system. Neural override chip embedded behind the left ear — same encryption signature as the files on this network. Elevated cortisol. Suppressed pain response.\n\nThe shift manager is not a manager. He\'s a field asset.\n\nAnd thanks to your scan, his systems are already exposed.',
+         storyBeat:'His augments cut out mid-swing. He drops like the hardware shut off — because it did.\n\nOn the floor, he looks almost normal. Just a guy in a polo shirt. Until you see the scar behind his ear.\n\nProgram Vector. He\'s a successful subject. Someone modified him and parked him here like a guard dog with a name tag.\n\nYour ROOTKIT saves the biometric signature. You\'re going to need it.'},
+      ]
+    }
+  },
+  warehouse:{
+    name:'PORTSIDE WAREHOUSE',
+    brief:"Gang server farm routing stolen financial data. Snort IDS active. FTP service hasn't been patched since 2016. Deep in the logs — references to 'batch deliveries' and biometric scans. Something bigger is running through here.",
+    dungeonTitle:'// WAREHOUSE SERVER FARM',
+    nodes:[
+      {id:'entry',port:':443',service:'HTTPS',status:'open',x:5,y:38,to:['ids','ftp']},
+      {id:'ids',port:':5000',service:'Snort IDS',status:'secure',x:28,y:12,to:['dmz']},
+      {id:'ftp',port:':21',service:'vsftpd 2.3',status:'vuln',x:28,y:62,to:['dmz']},
+      {id:'dmz',port:'dmz',service:'DMZ',status:'secure',x:52,y:38,to:['db','rssh']},
+      {id:'db',port:':3306',service:'MySQL 5.5',status:'vuln',x:72,y:14,to:['rssh']},
+      {id:'rssh',port:':22',service:'ROOT SSH',status:'target',x:80,y:60,to:[]},
+    ],
+    enemies:{
+      stealth:[
+        {name:'PATROL DRONE',hp:35,maxHp:35,spr:'🤖',dmg:[8,13],weak:'exploit',rew:{m:110,c:45}},
+        {name:'GANG GRUNT',hp:65,maxHp:65,spr:'😤',dmg:[11,17],weak:null,rew:{m:125,c:42}},
+        {name:'BOSS: VIPER',hp:110,maxHp:110,spr:'🐍',dmg:[14,21],weak:'exploit',rew:{m:265,c:110}},
+      ],
+      loud:[
+        {name:'GUARD DOG',hp:50,maxHp:50,spr:'🐕',dmg:[12,18],weak:null,rew:{m:85,c:20}},
+        {name:'GANG GRUNT',hp:80,maxHp:80,spr:'😤',dmg:[13,19],weak:null,rew:{m:105,c:30}},
+        {name:'ENFORCER',hp:95,maxHp:95,spr:'🔫',dmg:[17,25],weak:null,rew:{m:135,c:40}},
+        {name:'BOSS: VIPER',hp:155,maxHp:155,spr:'🐍',dmg:[19,28],weak:null,rew:{m:310,c:85}},
+      ],
+      exploit:[
+        {name:'OFFLINE DRONE',hp:28,maxHp:28,spr:'🤖',dmg:[5,9],weak:'exploit',rew:{m:105,c:52}},
+        {name:'GANG GRUNT',hp:55,maxHp:55,spr:'😤',dmg:[8,14],weak:null,rew:{m:115,c:42}},
+        {name:'BOSS: VIPER',hp:82,maxHp:82,spr:'🐍',dmg:[10,16],weak:'exploit',rew:{m:290,c:125}},
+      ]
+    }
+  },
+  clinic:{
+    name:'VALE STREET CLINIC',
+    brief:"Walk-in clinic in a grey neighborhood. Showed up in the laundromat's transaction logs. Patient records are corrupted — or deliberately altered. Someone is screening people here for something, and the patients don't know it.",
+    dungeonTitle:'// CLINIC RECORDS ROOM',
+    nodes:[
+      {id:'entry',port:':80',service:'HTTP',status:'open',x:5,y:38,to:['records','billing']},
+      {id:'records',port:':5432',service:'PostgreSQL',status:'vuln',x:30,y:12,to:['admin']},
+      {id:'billing',port:':8443',service:'HTTPS BIL',status:'secure',x:30,y:64,to:['admin']},
+      {id:'admin',port:':3389',service:'RDP ADMIN',status:'target',x:70,y:38,to:[]},
+    ],
+    enemies:{
+      stealth:[
+        {name:'CLINIC SECURITY',hp:45,maxHp:45,spr:'🦺',dmg:[8,13],weak:null,rew:{m:95,c:35}},
+        {name:'BOSS: HEAD NURSE',hp:80,maxHp:80,spr:'🧑‍⚕️',dmg:[12,18],weak:null,rew:{m:160,c:65}},
+      ],
+      loud:[
+        {name:'CLINIC SECURITY',hp:65,maxHp:65,spr:'🦺',dmg:[11,17],weak:null,rew:{m:80,c:25}},
+        {name:'ARMED ESCORT',hp:85,maxHp:85,spr:'🔫',dmg:[15,22],weak:null,rew:{m:110,c:35}},
+        {name:'BOSS: HEAD NURSE',hp:115,maxHp:115,spr:'🧑‍⚕️',dmg:[18,26],weak:null,rew:{m:175,c:70}},
+      ],
+      exploit:[
+        {name:'DISTRACTED NURSE',hp:38,maxHp:38,spr:'😰',dmg:[6,10],weak:null,rew:{m:90,c:38}},
+        {name:'BOSS: HEAD NURSE',hp:60,maxHp:60,spr:'🧑‍⚕️',dmg:[10,15],weak:'exploit',rew:{m:200,c:85}},
+      ]
+    }
+  },
+  neon:{
+    name:'NEXAGEN BIOMETRICS',
+    brief:"Corporate research division. You've seen their name in three different networks now. The laundromat, the warehouse, the clinic — they all lead here. This is where the subjects end up. This is where PROGRAM VECTOR lives. Act 1 finale. Expect augmented guards.",
+    dungeonTitle:'// NEXAGEN — SUBLEVEL 3',
+    nodes:[
+      {id:'entry',port:':443',service:'CORP HTTPS',status:'open',x:5,y:38,to:['waf','vpn']},
+      {id:'waf',port:'WAF',service:'ModSecurity',status:'secure',x:25,y:12,to:['dmz']},
+      {id:'vpn',port:':1194',service:'OpenVPN',status:'vuln',x:25,y:62,to:['dmz']},
+      {id:'dmz',port:'dmz',service:'CORP DMZ',status:'secure',x:47,y:38,to:['lab','classified']},
+      {id:'lab',port:':8080',service:'LAB INTRANET',status:'vuln',x:67,y:15,to:['classified']},
+      {id:'classified',port:':22',service:'CLASSIFIED SSH',status:'target',x:80,y:55,to:[]},
+    ],
+    enemies:{
+      stealth:[
+        {name:'CORP SECURITY',hp:55,maxHp:55,spr:'🦾',dmg:[10,15],weak:null,rew:{m:130,c:60}},
+        {name:'AUGMENTED GUARD',hp:90,maxHp:90,spr:'🤖',dmg:[15,22],weak:'exploit',rew:{m:160,c:75},note:'Unnatural reaction speed. Enhanced.'},
+        {name:'BOSS: DR. HARLOW',hp:130,maxHp:130,spr:'🧬',dmg:[18,26],weak:'exploit',rew:{m:350,c:160},note:'Program Vector overseer.'},
+      ],
+      loud:[
+        {name:'CORP SECURITY',hp:75,maxHp:75,spr:'🦾',dmg:[13,19],weak:null,rew:{m:110,c:45}},
+        {name:'AUGMENTED GUARD',hp:120,maxHp:120,spr:'🤖',dmg:[18,26],weak:null,rew:{m:145,c:60},note:'WARNING: abnormal strength.'},
+        {name:'FAILED SUBJECT',hp:80,maxHp:80,spr:'😱',dmg:[20,30],weak:null,rew:{m:100,c:50},note:'Not a guard. Something went wrong.'},
+        {name:'BOSS: DR. HARLOW',hp:180,maxHp:180,spr:'🧬',dmg:[22,32],weak:null,rew:{m:380,c:140}},
+      ],
+      exploit:[
+        {name:'CORP SECURITY',hp:45,maxHp:45,spr:'🦾',dmg:[8,13],weak:null,rew:{m:125,c:65}},
+        {name:'AUGMENTED GUARD',hp:70,maxHp:70,spr:'🤖',dmg:[12,18],weak:'exploit',rew:{m:155,c:80},note:'Systems exposed. Exploit available.'},
+        {name:'BOSS: DR. HARLOW',hp:100,maxHp:100,spr:'🧬',dmg:[14,20],weak:'exploit',rew:{m:400,c:200},note:'Program Vector overseer. Weakness mapped.'},
+      ]
+    }
+  }
+};
+
+// ── STATE HELPERS ───────────────────────────────────────────────
+let selNode=null,traceR=10,intR=10,focusR=10,hackNodes=[],hackEdges=[];
+let currentEnemy=null,pendingLoreKey=null;
+
+function $id(id){return document.getElementById(id);}
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  $id(id).classList.add('active');
+}
+
+function updateHUD(){
+  $id('h-str').textContent=G.str;
+  $id('h-int').textContent=G.int;
+  $id('h-money').textContent=G.money;
+  $id('h-bank').textContent=G.bank;
+  $id('h-crypto').textContent=G.crypto;
+  $id('h-rep').textContent=G.rep;
+  $id('h-files').textContent=G.filesFound;
+  $id('hud').style.display='flex';
+  if(G.int>=6&&G.story.warehouseUnlocked){
+    const wb=$id('warehouse-badge');if(wb){wb.textContent='MISSION 2';wb.className='badge bg';}
+  }
+  if(G.missionsCleared>=2){const c=$id('clinic-card');if(c)c.style.display='block';}
+  if(G.missionsCleared>=3){const c=$id('neoncard');if(c)c.style.display='block';}
+  // mission card states
+  const cards=[
+    {
+      id:'laundry', unlocked:G.story.laundryUnlocked,
+      label:'MISSION 1', cls:'bg',
+      unlockedDesc:"Front op. Ancient router. Marcus's tip — investigate the Nexagen connection.",
+      lockedDesc:'Go to Community College first — Marcus has a lead.'
+    },
+    {
+      id:'warehouse', unlocked:G.story.warehouseUnlocked,
+      label:'MISSION 2'+(G.int<6?' — INT 6 REQ':''), cls:G.int>=6?'bg':'ba',
+      unlockedDesc:`Gang server farm. Stolen financial data. The laundromat logs point here.${G.int<6?' Raise INT to 6 first.':''}`,
+      lockedDesc:'Clear the laundromat first. Something bigger is running through there.'
+    },
+    {
+      id:'clinic', unlocked:G.story.clinicUnlocked,
+      label:'MISSION 3', cls:'bg',
+      unlockedDesc:'Walk-in clinic on Vale. Corrupted patient records. The warehouse comms mention this place.',
+      lockedDesc:'Clear the warehouse first. The logs point here next.'
+    },
+    {
+      id:'neon', unlocked:G.story.neonUnlocked,
+      label:'MISSION 4 — FINALE', cls:'bp',
+      unlockedDesc:'Corp research division. Classified biometric logs. Every thread leads here.',
+      lockedDesc:'Clear the clinic first. Every thread leads here.'
+    },
+  ];
+  cards.forEach(c=>{
+    const badge=$id(c.id+'-badge');
+    const desc=$id(c.id+'-desc');
+    const card=$id(c.id==='neon'?'neoncard':c.id+'-card');
+    if(!badge||!desc)return;
+    if(c.unlocked){
+      badge.textContent=c.label;badge.className='badge '+c.cls;
+      desc.textContent=c.unlockedDesc;
+      if(card)card.style.opacity='1';
+    } else {
+      badge.textContent='LOCKED';badge.className='badge br';
+      desc.textContent=c.lockedDesc;
+      if(card)card.style.opacity='0.5';
+    }
+  });
+}
+
+function notify(msg,type=''){
+  const n=$id('notif');
+  n.textContent=msg;n.className='notif show'+(type?' '+type:'');
+  clearTimeout(n._t);n._t=setTimeout(()=>n.classList.remove('show'),3200);
+}
+
+function addLog(id,msg,cls=''){
+  const el=$id(id);
+  const d=document.createElement('div');
+  d.className='tl '+(cls||'');d.textContent=msg;
+  el.appendChild(d);el.scrollTop=el.scrollHeight;
+}
+
+function showLore(key){
+  const l=LORE[key];
+  if(!l)return;
+  $id('lore-title').textContent=l.title;
+  $id('lore-filename').textContent=l.filename;
+  $id('lore-content').innerHTML=l.content.replace(/\n/g,'<br>');
+  $id('lore-footer').textContent=l.footer;
+  $id('lore-popup').classList.add('show');
+}
+function closeLore(){$id('lore-popup').classList.remove('show');}
+function showLoreFromDrop(){
+  if(pendingLoreKey)showLore(pendingLoreKey);
+}
+
+// ── BOOT ────────────────────────────────────────────────────────
+const BLINES=[
+  ['[BOOT]  Initializing kernel modules...',''],
+  ['[NET]   Scanning: lo0 eth0 wlan0 — found',''],
+  ['[WARN]  CUPS 1.4.6 — unpatched (CVE-2015-1158)','twarn'],
+  ['[WARN]  OpenSSH 6.1p1 — version flagged','twarn'],
+  ['[FS]    /proc /sys /dev — mounted',''],
+  ['[SYS]   4096MB RAM — OK',''],
+  ['[INIT]  ROOTKIT framework v0.1 loading...',''],
+  ['[NET]   Anomalous packet signature on eth0','tinfo'],
+  ['[NET]   Pattern: operator-class signal','tinfo'],
+  ['[NET]   Cross-referencing known signatures...','tinfo'],
+  ['[NET]   No match found in public databases','twarn'],
+  ['[ROOTKIT] ██ signal origin: NEXAGEN BIOMETRICS?','tlore'],
+  ['[ROOTKIT] Framework source: UNKNOWN','tlore'],
+  ['[SYSTEM] ACCESS GRANTED — USER_47 INITIALIZED','tok'],
+];
+(function boot(){
+  const log=$id('boot-log');let i=0;
+  function next(){
+    if(i>=BLINES.length){$id('start-btn').style.display='inline-block';return;}
+    const[t,c]=BLINES[i++];
+    const d=document.createElement('div');
+    d.className='tl '+(c||'');d.textContent=t;
+    log.appendChild(d);log.scrollTop=log.scrollHeight;
+    setTimeout(next,240);
+  }
+  setTimeout(next,500);
+})();
+
+function showCity(){stopEnemyTicker();updateHUD();show('city');}
+function goHome(){
+  const brief=document.getElementById('home-brief');
+  if(brief){
+    if(G.story.laundryUnlocked){
+      brief.innerHTML='The ROOTKIT framework is active. Marcus\'s tip checks out — the laundromat on Vale Street is connected to Nexagen. Time to find out how.<br><br><span style="color:var(--green)">→ Sudz Laundromat is now unlocked.</span>';
+    } else if(G.story.introSeen){
+      brief.innerHTML='$47 to your name. The ROOTKIT just activated — it\'s flagging encrypted traffic nearby. Marcus texted. He\'s at the community college, Room 14B.<br><br><span style="color:var(--amber)">→ Head to Community College.</span>';
+    }
+  }
+  show('home');
+}
+
+function doJob(){
+  G.money+=85;notify('+$85 — SHIFT COMPLETE');
+  setTimeout(()=>notify('You reset 47 passwords. Something is deeply wrong.','warn'),1600);
+  updateHUD();
+}
+
+function doGym(){
+  if(G.money<20){notify('Need $20','err');return;}
+  G.money-=20;G.str++;notify('GYM: +1 STR');updateHUD();
+}
+
+function doRest(){
+  G.stims=3;G.php=G.phmax;G.termUsed=false;G.bagUsed=false;
+  notify('RESTED: HP full. Stims refreshed. Daily actions reset.');updateHUD();
+}
+
+function doTerminal(){
+  if(G.termUsed){notify('Already practiced today','warn');return;}
+  G.int++;G.termUsed=true;notify('PRACTICE: +1 INT');updateHUD();
+}
+
+function doBag(){
+  if(G.bagUsed){notify('Already trained today','warn');return;}
+  G.str++;G.bagUsed=true;notify('TRAINING: +1 STR');updateHUD();
+}
+
+// ── MISSION / APPROACH ─────────────────────────────────────────
+function selectMission(id){
+  if(id==='laundromat'&&!G.story.laundryUnlocked){
+    notify('Go to Community College first — Marcus has a lead.','warn');return;
+  }
+  if(id==='warehouse'&&!G.story.warehouseUnlocked){
+    notify('Clear the laundromat first.','warn');return;
+  }
+  if(id==='warehouse'&&G.int<6){
+    notify('INT 6+ required for warehouse approach.','err');return;
+  }
+  if(id==='clinic'&&!G.story.clinicUnlocked){
+    notify('Clear the warehouse first — the logs point there next.','warn');return;
+  }
+  if(id==='neon'&&!G.story.neonUnlocked){
+    notify('Clear the clinic first — every thread leads to Nexagen.','warn');return;
+  }
+  G.mission=id;G.approach=null;
+  const m=MISSIONS[id];
+  $id('hack-title').textContent='// '+m.name.toUpperCase();
+  $id('hack-brief').textContent=m.brief;
+  $id('puzz-wrap').style.display='none';
+  const grid=$id('agrid');grid.innerHTML='';
+  const opts=[
+    {k:'stealth',label:'STEALTH HACK',desc:'Navigate node by node. Fewer enemies, cleaner data extract.',cost:'Uses TRACE + INT resources.',col:'var(--green)'},
+    {k:'loud',label:'BRUTE FORCE',desc:'Skip the puzzle. Enter loud. More enemies, faster reward.',cost:`STR ${G.str>=4?'✓':'✗ needs 4+'}`,col:'var(--red)'},
+    {k:'exploit',label:'OSINT + EXPLOIT',desc:'Map weaknesses first. Exposes boss vulnerabilities.',cost:`INT ${G.int>=5?'✓':'✗ needs 5+'}`,col:'var(--amber)'},
+  ];
+  opts.forEach(o=>{
+    const el=document.createElement('div');
+    el.className='acard';
+    el.innerHTML=`<h4 style="color:${o.col}">${o.label}</h4><p>${o.desc}</p><div class="acost">${o.cost}</div>`;
+    el.onclick=()=>pickApproach(o.k);
+    grid.appendChild(el);
+  });
+  show('hack');
+}
+
+function pickApproach(k){
+  if(k==='loud'&&G.str<4){notify('STR 4+ required','err');return;}
+  if(k==='exploit'&&G.int<5){notify('INT 5+ required','err');return;}
+  G.approach=k;
+  if(k==='loud'){
+    addLog('tlog','$ brute_force --no-recon','twarn');
+    addLog('tlog','Skipping network. Entering hot.','twarn');
+    setTimeout(()=>launchDungeon(),1000);
+    return;
+  }
+  $id('puzz-wrap').style.display='block';
+  buildPuzzle();
+  addLog('tlog','$ rootkit --scan-target '+G.mission,'tinfo');
+  addLog('tlog','Building topology map...','');
+}
+
+function renderPuzzle(){
+  const canvas=$id('ncanvas');
+  const W=canvas.clientWidth||760,H=230;
+  canvas.querySelectorAll('.node').forEach(n=>n.remove());
+  const svg=$id('esvg');svg.innerHTML='';
+  const pos={};
+  hackNodes.forEach(n=>{pos[n.id]={x:Math.round(n.x/100*(W-125)),y:Math.round(n.y/100*(H-55))};});
+
+  hackEdges.forEach(([a,b])=>{
+    const pa=pos[a],pb=pos[b];if(!pa||!pb)return;
+    const na=hackNodes.find(n=>n.id===a);
+    const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',pa.x+58);line.setAttribute('y1',pa.y+24);
+    line.setAttribute('x2',pb.x+58);line.setAttribute('y2',pb.y+24);
+    const active=na&&na.status==='done';
+    line.setAttribute('stroke',active?'rgba(0,204,122,0.45)':'rgba(20,40,20,0.9)');
+    line.setAttribute('stroke-width','1.5');
+    if(!active)line.setAttribute('stroke-dasharray','4 4');
+    svg.appendChild(line);
+  });
+
+  hackNodes.forEach(n=>{
+    const p=pos[n.id];
+    const el=document.createElement('div');
+    el.className='node';
+    if(n.id==='entry')el.classList.add('n-entry');
+    if(n.status==='done')el.classList.add('done');
+    else if(n.status==='secure')el.classList.add('nsec');
+    else if(n.status==='target')el.classList.add('ntgt');
+    if(n.id===selNode&&n.status!=='done')el.classList.add('nact');
+    if(n.id!=='entry'&&!reach(n.id))el.classList.add('nd');
+    el.style.left=p.x+'px';el.style.top=p.y+'px';
+    const sc=n.status==='done'?'sd':n.status==='vuln'?'sv':n.status==='secure'?'ss':n.status==='target'?'st':'so';
+    el.innerHTML=`<div class="nport">${n.port}</div><div class="nsvc">${n.service}</div><div class="nstat ${sc}">[${n.status.toUpperCase()}]</div>`;
+    el.id='nd-'+n.id;
+    el.onclick=()=>pickNode(n.id);
+    canvas.appendChild(el);
+  });
+}
+
+function reach(id){
+  for(const[a,b]of hackEdges){
+    if(b===id){const s=hackNodes.find(n=>n.id===a);if(s&&(s.id==='entry'||s.status==='done'))return true;}
+  }
+  return false;
+}
+
+function pickNode(id){
+  const n=hackNodes.find(x=>x.id===id);
+  if(!n||n.status==='done')return;
+  if(n.id!=='entry'&&!reach(id)){notify('Node not reachable yet','warn');return;}
+  selNode=id;
+  addLog('tlog',`$ select ${n.service} ${n.port}`,'tinfo');
+  renderPuzzle();
+}
+
+function doScan(){
+  if(!selNode){notify('Select a node first','warn');return;}
+  const cost=G._freeScan?0:1;
+  if(traceR<cost){notify('No TRACE left','err');return;}
+  traceR-=cost;updRes();
+  const n=hackNodes.find(x=>x.id===selNode);
+  addLog('tlog',`$ nmap -sV ${n.port} target${G._freeScan?' [free scan]':''}`,'tinfo');
+  if(n.status==='vuln')addLog('tlog',`VULN: ${n.service} — CVE-${2010+Math.floor(Math.random()*13)}-${Math.floor(Math.random()*9999)}`,'tok');
+  else if(n.status==='secure')addLog('tlog',`HARDENED: ${n.service} — bypass required`,'twarn');
+  else if(n.status==='target')addLog('tlog',`TARGET: ${n.service} — exploit or bypass for root`,'twarn');
+  else addLog('tlog',`${n.service}: ${n.status}`,'');
+}
+
+
+function doBypass(){
+  if(!selNode){notify('Select a node','warn');return;}
+  if(focusR<2){notify('Not enough FOCUS','err');return;}
+  const n=hackNodes.find(x=>x.id===selNode);
+  focusR-=2;updRes();
+  addLog('tlog',`$ bypass --reroute ${n.service}`,'twarn');
+  n.status='done';
+  addLog('tlog',`BYPASSED: ${n.service}`,'tok');
+  renderPuzzle();
+  const targets=['admin','rssh','classified'];
+  if(targets.includes(n.id))setTimeout(puzzleDone,700);
+}
+
+function puzzleDone(){
+  G.bossWeak=(G.approach==='exploit'||intR>=4);
+  addLog('tlog','ROOT ACCESS ESTABLISHED','tok');
+  addLog('tlog',G.bossWeak?'INTEL: Boss weakness mapped.':'Entering dungeon cold.',G.bossWeak?'tok':'twarn');
+  setTimeout(()=>launchDungeon(),1100);
+}
+
+function updRes(){
+  $id('rtv').textContent=traceR;$id('riv').textContent=intR;$id('rfv').textContent=focusR;
+  $id('rt').style.width=(traceR*10)+'%';
+  $id('ri').style.width=Math.min(100,intR*10)+'%';
+  $id('rf').style.width=Math.min(100,focusR*10)+'%';
+}
+
+// ── PERK CATALOGUE ─────────────────────────────────────────────
+const PERKS=[
+  // HACKER TRACK — Community College
+  {id:'efficient_scans',icon:'🔍',name:'Efficient Scans',track:'hacker',
+    desc:'Reduce SCAN cost to 0 TRACE. Gather intel freely.',
+    cost:120,intReq:0,effect:'SCAN costs 0 TRACE',apply:()=>{G._freeScan=true;}},
+  {id:'pattern_recognition',icon:'🧩',name:'Pattern Recognition',track:'hacker',
+    desc:'Start every puzzle with 1 random vuln node already compromised.',
+    cost:200,intReq:6,effect:'Puzzle: 1 free node revealed',apply:()=>{G._freeNode=true;}},
+  {id:'exploit_specialist',icon:'⚡',name:'Exploit Specialist',track:'hacker',
+    desc:'EXPLOIT WEAKNESS deals +50% damage.',
+    cost:180,intReq:7,effect:'EXPLOIT WEAKNESS: +50% dmg',apply:()=>{G._exploitBonusDmg=1.5;}},
+  {id:'silent_operator',icon:'👻',name:'Silent Operator',track:'hacker',
+    desc:'Stealth dungeons spawn one fewer enemy per run.',
+    cost:160,intReq:5,effect:'Stealth: -1 enemy per run',apply:()=>{G._silentOp=true;}},
+  // HYBRID TRACK — Community College
+  {id:'backdoor_access',icon:'🚪',name:'Backdoor Access',track:'hybrid',
+    desc:'Entry node pre-compromised at the start of every puzzle.',
+    cost:220,intReq:6,effect:'Puzzle: entry pre-completed',apply:()=>{G._backdoor=true;}},
+  {id:'adrenaline_hack',icon:'💊',name:'Adrenaline Protocol',track:'hybrid',
+    desc:'Room clear heals +8 HP. Momentum rewards aggression.',
+    cost:175,intReq:0,effect:'Room clear: +8 HP',apply:()=>{G._adrenaline=8;}},
+];
+
+const DOJO_PERKS=[
+  // FIGHTER TRACK — Iron District Dojo
+  {id:'street_discipline',icon:'🛡️',name:'Street Discipline',track:'fighter',
+    desc:'Guard stance blocks 70% damage instead of 50%. Two hits still breaks it.',
+    cost:140,strReq:0,effect:'GUARD: 50% → 70% reduction',apply:()=>{G._guardBonus=0.7;}},
+  {id:'combo_training',icon:'👊',name:'Combo Training',track:'fighter',
+    desc:'After landing PUNCH, KICK cooldown resets instantly.',
+    cost:160,strReq:4,effect:'PUNCH → KICK: instant reset',apply:()=>{G._comboReset=true;}},
+  {id:'iron_chin',icon:'🦾',name:'Iron Chin',track:'fighter',
+    desc:'Conditioning work. Max HP +30 permanently.',
+    cost:200,strReq:0,effect:'Max HP +30',apply:()=>{G.phmax+=30;G.php=Math.min(G.php+30,G.phmax);}},
+  {id:'pressure_striking',icon:'💢',name:'Pressure Striking',track:'fighter',
+    desc:'Each STR point adds +2 PUNCH damage instead of +0.5.',
+    cost:180,strReq:5,effect:'PUNCH STR scaling ×4',apply:()=>{G._punchStrScale=4;}},
+];
+
+// ── COLLEGE ────────────────────────────────────────────────────
+function goCollege(){
+  if(!G.story.metMarcus){
+    G.story.collegeVisited=true;
+    runDialogue(MARCUS_INTRO_SCRIPT, ()=>{
+      G.story.metMarcus=true;
+      G.story.laundryUnlocked=true;
+      notify('LAUNDROMAT UNLOCKED — Sudz Laundry, Vale Street.','lore');
+      updateHUD();
+      renderCollegeIdentity('college-identity');
+      renderPerkList('perk-grid',PERKS,'int');
+      renderAllActivePerks('active-perks');
+      show('college');
+    });
+    return;
+  }
+  renderCollegeIdentity('college-identity');
+  renderPerkList('perk-grid',PERKS,'int');
+  renderAllActivePerks('active-perks');
+  show('college');
+}
+
+function goDojo(){
+  renderCollegeIdentity('dojo-identity');
+  renderPerkList('dojo-perk-grid', DOJO_PERKS, 'str');
+  renderAllActivePerks('dojo-active-perks');
+  show('dojo');
+}
+
+
+function renderCollegeIdentity(targetId){
+  const strScore=G.str,intScore=G.int,total=strScore+intScore||1;
+  const strPct=Math.round(strScore/total*100),intPct=Math.round(intScore/total*100);
+  let style='HYBRID',styleColor='var(--amber)';
+  if(strPct>=65){style='BRAWLER';styleColor='var(--red)';}
+  else if(intPct>=65){style='OPERATOR';styleColor='var(--green)';}
+  const el=document.getElementById(targetId);
+  el.innerHTML=`
+    <div class="identity-card">
+      <h4 style="color:var(--red)">🥊 FIGHTER</h4>
+      <p>STR drives combat damage and brute force access.</p>
+      <div class="istats">STR: <span style="color:var(--red)">${G.str}</span> &nbsp;|&nbsp; HP: <span style="color:var(--green)">${G.php}/${G.phmax}</span></div>
+    </div>
+    <div class="identity-card">
+      <h4 style="color:var(--green)">💻 HACKER</h4>
+      <p>INT drives puzzle power and exploit success.</p>
+      <div class="istats">INT: <span style="color:var(--green)">${G.int}</span> &nbsp;|&nbsp; REP: <span style="color:var(--blue)">${G.rep}</span></div>
+    </div>
+    <div class="identity-card" style="grid-column:1/-1;border-color:${styleColor}">
+      <h4 style="color:${styleColor}">PLAYSTYLE: ${style}</h4>
+      <p style="color:var(--txd)">STR ${strPct}% / INT ${intPct}% &nbsp;|&nbsp; Cash: $${G.money} &nbsp;Bank: $${G.bank}</p>
+    </div>`;
+}
+
+function renderPerkList(gridId, catalogue, reqStat){
+  const grid=document.getElementById(gridId);
+  if(!grid)return;
+  grid.innerHTML='';
+  catalogue.forEach(p=>{
+    const owned=!!G.owned['perk_'+p.id];
+    const canAfford=G.money>=p.cost;
+    const req=reqStat==='int'?(p.intReq||0):(p.strReq||0);
+    const stat=reqStat==='int'?G.int:G.str;
+    const meetsReq=stat>=req;
+    const el=document.createElement('div');
+    el.className='perk-card'+(owned?' pk-owned':!meetsReq?' pk-locked':'');
+    const trackColor=p.track==='hacker'?'var(--green)':p.track==='fighter'?'var(--red)':'var(--amber)';
+    const trackLabel=p.track==='hacker'?'HACKER TRACK':p.track==='fighter'?'FIGHTER TRACK':'HYBRID TRACK';
+    el.innerHTML=`
+      <div style="font-size:9px;color:${trackColor};letter-spacing:2px;margin-bottom:6px">${trackLabel}</div>
+      <div class="pk-icon">${p.icon}</div>
+      <div class="pk-name">${p.name}</div>
+      <div class="pk-desc">${p.desc}</div>
+      <div class="pk-effect">${p.effect}</div>
+      <div class="pk-cost">Cost: $${p.cost}${req>0?' &nbsp;|&nbsp; Requires '+reqStat.toUpperCase()+' '+req:''}</div>
+      ${owned
+        ?`<span class="pk-owned-tag">✓ ACTIVE</span>`
+        :!meetsReq
+          ?`<div class="pk-req">${reqStat.toUpperCase()} ${req} required (you have ${stat})</div>`
+          :`<button class="pk-buy" onclick="buyPerk('${p.id}')" ${!canAfford?'disabled':''}>
+              ${canAfford?'[ ENROLL — $'+p.cost+' ]':'[ NEED $'+(p.cost-G.money)+' MORE ]'}
+            </button>`
+      }`;
+    grid.appendChild(el);
+  });
+}
+
+function buyPerk(id){
+  const allPerks=[...PERKS,...DOJO_PERKS];
+  const p=allPerks.find(x=>x.id===id);
+  if(!p||G.owned['perk_'+p.id]){notify('Already enrolled','warn');return;}
+  if(G.money<p.cost){notify('Not enough cash','err');return;}
+  const req=p.intReq||0,strReq=p.strReq||0;
+  if(G.int<req){notify(`INT ${req} required`,'err');return;}
+  if(G.str<strReq){notify(`STR ${strReq} required`,'err');return;}
+  G.money-=p.cost;
+  G.owned['perk_'+p.id]=true;
+  p.apply();
+  notify(`ENROLLED: ${p.name}`);
+  // refresh whichever screen is active
+  if(p.loc==='dojo'){renderCollegeIdentity('dojo-identity');renderPerkList('dojo-perk-grid',DOJO_PERKS,'str');renderAllActivePerks('dojo-active-perks');}
+  else{renderCollegeIdentity('college-identity');renderPerkList('perk-grid',PERKS,'int');renderAllActivePerks('active-perks');}
+  updateHUD();
+}
+
+function renderAllActivePerks(elId){
+  const allPerks=[...PERKS,...DOJO_PERKS];
+  const owned=allPerks.filter(p=>G.owned['perk_'+p.id]);
+  const el=document.getElementById(elId);
+  if(!el)return;
+  if(!owned.length){el.textContent='No perks unlocked yet.';return;}
+  el.innerHTML=owned.map(p=>{
+    const tc=p.track==='hacker'?'var(--green)':p.track==='fighter'?'var(--red)':'var(--amber)';
+    return `<span style="color:${tc}">${p.icon} ${p.name}</span> — <span style="color:var(--txd)">${p.effect}</span>`;
+  }).join('<br>');
+}
+
+// ── COOLDOWN SYSTEM ────────────────────────────────────────────
+const CD={punch:0,kick:0,special:0,guard:0};
+const CD_MAX={punch:2,kick:3,special:5,guard:4}; // turns
+
+function tickCooldowns(){
+  ['punch','kick','special','guard'].forEach(k=>{
+    if(CD[k]>0){
+      CD[k]--;
+      updateCDBar(k);
+    }
+  });
+}
+
+function updateCDBar(k){
+  const fill=document.getElementById('cd-'+k);
+  const btn=document.getElementById('btn-'+k)||document.getElementById('bspecial');
+  if(!fill)return;
+  const pct=CD[k]===0?100:Math.round((1-CD[k]/CD_MAX[k])*100);
+  fill.style.width=pct+'%';
+  const isReady=CD[k]===0;
+  if(btn){
+    btn.classList.toggle('on-cooldown',!isReady);
+    btn.disabled=!isReady;
+  }
+}
+
+function startCooldown(k){
+  CD[k]=CD_MAX[k];
+  updateCDBar(k);
+}
+
+function resetAllCooldowns(){
+  Object.keys(CD).forEach(k=>{CD[k]=0;updateCDBar(k);});
+}
+
+let enemyTicker=null;
+let guardActive=false;
+let guardDurability=0;
+
+function startEnemyTicker(){
+  stopEnemyTicker();
+  enemyTicker=setInterval(()=>{
+    if(G.ehp<=0||G.php<=0)return;
+    tickCooldowns();
+    enemyAtk();
+  },2800);
+}
+
+function stopEnemyTicker(){
+  if(enemyTicker){clearInterval(enemyTicker);enemyTicker=null;}
+}
+
+function doGuard(){
+  if(CD.guard>0){notify('Guard on cooldown','warn');return;}
+  guardActive=true;
+  guardDurability=2;
+  const reduction=G._guardBonus||0.5;
+  const pct=Math.round(reduction*100);
+  addLog('clog',`GUARD UP — ${pct}% dmg reduction for 2 hits`,'tinfo');
+  $id('guard-wrap').style.display='block';
+  $id('guard-fill').style.width='100%';
+  startCooldown('guard');
+}
+
+function doPunch(){
+  if(CD.punch>0){notify('Punch cooling down','warn');return;}
+  if(G.php<=0||G.ehp<=0)return;
+  const bonus=G._punchBonus||0;
+  const strMult=G._punchStrScale||1;
+  const dmg=Math.floor(Math.random()*7)+8+Math.floor(G.str/2*strMult)+bonus;
+  startCooldown('punch');
+  if(G._comboReset&&CD.kick>0){CD.kick=0;updateCDBar('kick');addLog('clog','COMBO: kick ready!','tinfo');}
+  playerAtk(dmg,'PUNCH');
+}
+
+function doKick(){
+  if(CD.kick>0){notify('Kick cooling down','warn');return;}
+  if(G.php<=0||G.ehp<=0)return;
+  const bonus=G._kickBonus||0;
+  const dmg=Math.floor(Math.random()*7)+14+Math.floor(G.str/2)+bonus;
+  startCooldown('kick');
+  playerAtk(dmg,'KICK');
+}
+
+function doSpecial(){
+  if(CD.special>0){notify('On cooldown','warn');return;}
+  if(G.php<=0||G.ehp<=0)return;
+  if(!currentEnemy.weak||!G.bossWeak){notify('No weakness active','warn');return;}
+  const base=Math.floor(Math.random()*25)+35+G.int*2;
+  const dmg=Math.round(base*(G._exploitBonusDmg||1));
+  addLog('clog',`EXPLOIT WEAKNESS${G._exploitBonusDmg?' [SPECIALIST BONUS]':''}!`,'twarn');
+  startCooldown('special');
+  playerAtk(dmg,'EXPLOIT HIT');
+}
+
+function doStim(){
+  if(G.stims<=0){notify('No stims remaining','err');return;}
+  G.stims--;
+  const heal=G._stimHeal||25;
+  G.php=Math.min(G.phmax,G.php+heal);
+  addLog('clog',`STIM: +${heal} HP`,'tok');
+  updateBars();updateHUD();
+}
+
+function playerAtk(dmg,label){
+  G.ehp=Math.max(0,G.ehp-dmg);
+  const isCrit=dmg>=20;
+  const cls=isCrit?'tcrit':'tok';
+  const prefix=isCrit?'★ CRITICAL — ':'';
+  addLog('clog',`${prefix}YOU → ${label}: ${dmg} dmg${isCrit?' !!':''}`  ,cls);
+  updateBars();
+  if(G.ehp<=0){
+    stopEnemyTicker();
+    addLog('clog',`${currentEnemy.name} GOES DOWN.`,'tcrit');
+    setTimeout(roomWin,600);
+  }
+}
+
+function enemyAtk(){
+  if(!currentEnemy||G.ehp<=0||G.php<=0)return;
+  const e=currentEnemy;
+  let dmg=Math.floor(Math.random()*(e.dmg[1]-e.dmg[0]+1))+e.dmg[0];
+  if(G._jammerActive&&e.spr==='🤖'){
+    dmg=Math.floor(dmg*0.7);
+    addLog('clog','[JAMMER: drone disrupted]','tinfo');
+  }
+  if(guardActive){
+    const reduction=G._guardBonus||0.5;
+    dmg=Math.max(1,Math.floor(dmg*(1-reduction)));
+    guardDurability--;
+    addLog('clog',`GUARD ABSORBED: ${dmg} dmg (${Math.round(reduction*100)}% blocked)`,'tinfo');
+    if(guardDurability<=0){
+      guardActive=false;
+      $id('guard-wrap').style.display='none';
+      addLog('clog','Guard broke.','twarn');
+    } else {
+      $id('guard-fill').style.width=(guardDurability/2*100)+'%';
+    }
+  } else {
+    const isHeavy=dmg>=e.dmg[1]-1;
+    const cls=isHeavy?'tbighit':'terr';
+    addLog('clog',`${isHeavy?'★ ':''}${e.name} hits you for ${dmg}${isHeavy?' — HEAVY HIT':''}`,cls);
+  }
+  G.php=Math.max(0,G.php-dmg);
+  updateBars();
+  if(G.php<=0){stopEnemyTicker();setTimeout(playerDie,500);}
+}
+
+function playerDie(){
+  stopEnemyTicker();
+  const lost=G.money;G.money=0;
+  addLog('clog','YOU HAVE BEEN DEFEATED','terr');
+  if(lost>0){
+    addLog('clog',`$${lost} cash lost — banked funds and crypto safe`,'twarn');
+    notify(`DEFEATED — $${lost} lost. Bank $${G.bank} safe.`,'err');
+  } else {
+    addLog('clog','No cash on you — smart banking paid off','tok');
+    notify('DEFEATED — Nothing lost. Smart banking.','warn');
+  }
+  resetAllCooldowns();guardActive=false;
+  setTimeout(()=>{updateHUD();showCity();},2800);
+}
+
+function roomWin(){
+  stopEnemyTicker();
+  addLog('clog',`${currentEnemy.name} — ELIMINATED`,'tok');
+
+  G.roomRew.push(currentEnemy.rew);
+  // between-room recovery
+  const heal=G._adrenaline||10;
+  G.php=Math.min(G.phmax,G.php+heal);
+  addLog('clog',`+${heal} HP recovered`,'tok');
+  updateBars();
+  CD.punch=0;CD.kick=0;updateCDBar('punch');updateCDBar('kick');
+  guardActive=false;guardDurability=0;
+  $id('guard-wrap').style.display='none';
+
+  const isBoss=G.roomIdx===G.rooms.length-1;
+  const storyBeat=currentEnemy.storyBeat;
+  G.roomIdx++;
+
+  function afterBeat(){
+    if(G.roomIdx>=G.rooms.length) showReward();
+    else loadRoom(G.roomIdx);
+  }
+
+  // boss post-fight story: full dialogue overlay
+  if(isBoss&&storyBeat){
+    const beatScript=[];
+    storyBeat.split('\n\n').forEach(line=>{
+      if(line.trim()) beatScript.push({type:'narrate',text:line});
+    });
+    setTimeout(()=>{
+      runDialogue(beatScript, afterBeat);
+    },600);
+  } else {
+    setTimeout(afterBeat, 750);
+  }
+}
+
+// ── BANK ──────────────────────────────────────────────────────
+function goBank(){
+  $id('bank-cash').textContent='$'+G.money;
+  $id('bank-saved').textContent='$'+G.bank;
+  $id('bank-crypto').textContent='◆'+G.crypto;
+  show('bank');
+}
+
+function addBankLog(msg,cls){
+  const h=$id('bank-history');
+  // clear placeholder
+  if(h.querySelector('.bh-line')&&h.querySelector('.bh-line').textContent==='No transactions yet.')h.innerHTML='';
+  const d=document.createElement('div');
+  const ts=new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+  d.className='bh-line '+cls;d.textContent='['+ts+'] '+msg;
+  h.insertBefore(d,h.firstChild);
+}
+
+function doDeposit(){
+  const raw=parseInt($id('dep-amt').value);
+  if(!raw||raw<=0){notify('Enter a valid amount','warn');return;}
+  const amt=Math.min(raw,G.money);
+  if(amt<=0){notify('No cash on hand to deposit','err');return;}
+  G.money-=amt;G.bank+=amt;
+  addBankLog(`DEPOSIT +$${amt} → BANK ($${G.bank} total)`,'bh-dep');
+  notify(`DEPOSITED $${amt} — Safe in bank`);
+  $id('dep-amt').value='';
+  $id('bank-cash').textContent='$'+G.money;
+  $id('bank-saved').textContent='$'+G.bank;
+  updateHUD();
+}
+
+function doWithdraw(){
+  const raw=parseInt($id('with-amt').value);
+  if(!raw||raw<=0){notify('Enter a valid amount','warn');return;}
+  const amt=Math.min(raw,G.bank);
+  if(amt<=0){notify('No funds in bank','err');return;}
+  G.bank-=amt;G.money+=amt;
+  addBankLog(`WITHDRAW $${amt} → CASH ($${G.bank} remaining)`,'bh-with');
+  notify(`WITHDREW $${amt} — Now on your person`,  'warn');
+  $id('with-amt').value='';
+  $id('bank-cash').textContent='$'+G.money;
+  $id('bank-saved').textContent='$'+G.bank;
+  updateHUD();
+}
+
+function depositQuick(pct){
+  const amt=Math.floor(G.money*pct);
+  if(amt<=0){notify('No cash to deposit','err');return;}
+  $id('dep-amt').value=amt;doDeposit();
+}
+function withdrawQuick(pct){
+  const amt=Math.floor(G.bank*pct);
+  if(amt<=0){notify('No banked funds','err');return;}
+  $id('with-amt').value=amt;doWithdraw();
+}
+
+// ── BLACK MARKET ───────────────────────────────────────────────
+function goMarket(){
+  renderMarket();show('market');
+}
+
+function renderMarket(){
+  const grid=$id('market-grid');grid.innerHTML='';
+  MARKET_ITEMS.forEach(item=>{
+    const owned=!!G.owned[item.id];
+    const canAfford=G.crypto>=item.cost;
+    const el=document.createElement('div');
+    el.className='mitem'+(owned?' owned':!canAfford?' cantafford':'');
+    el.innerHTML=`
+      <div class="mitem-icon">${item.icon}</div>
+      <div class="mitem-name">${item.name}</div>
+      <div class="mitem-desc">${item.desc}</div>
+      <div class="mitem-cost">◆ ${item.cost} CRYPTO</div>
+      ${owned
+        ? `<span class="mitem-owned-tag">✓ OWNED / ACTIVE</span>`
+        : `<span class="mitem-effect">${item.effect}</span>
+           <button class="mitem-buy" onclick="buyItem('${item.id}')" ${!canAfford?'disabled':''}>
+             ${canAfford?'[ BUY ]':'[ INSUFFICIENT CRYPTO ]'}
+           </button>`
+      }`;
+    grid.appendChild(el);
+  });
+  renderEquipped();
+}
+
+function buyItem(id){
+  const item=MARKET_ITEMS.find(i=>i.id===id);
+  if(!item||G.owned[id]){notify('Already owned','warn');return;}
+  if(G.crypto<item.cost){notify('Not enough crypto','err');return;}
+  G.crypto-=item.cost;
+  G.owned[id]=true;
+  item.apply();
+  notify(`PURCHASED: ${item.name}`,'');
+  renderMarket();updateHUD();
+}
+
+function renderEquipped(){
+  const owned=MARKET_ITEMS.filter(i=>G.owned[i.id]);
+  const el=$id('equipped-list');
+  if(!owned.length){el.textContent='Nothing equipped yet.';return;}
+  el.innerHTML=owned.map(i=>`<span style="color:var(--green)">✓ ${i.name}</span> — <span style="color:var(--txd)">${i.effect}</span>`).join('<br>');
+}
+
+// ── APPLY MARKET BONUSES IN PUZZLE ────────────────────────────
+function doExploit(){
+  if(!selNode){notify('Select a node','warn');return;}
+  const cost=Math.max(1,2-(G._exploitDiscount||0));
+  if(intR<cost){notify(`Not enough INT (need ${cost})`,'err');return;}
+  const n=hackNodes.find(x=>x.id===selNode);
+  // Zero-day lets you exploit secure nodes
+  if(n.status==='secure'){
+    if(G._zeroDays>0){
+      G._zeroDays--;
+      notify(`ZERO-DAY USED (${G._zeroDays} remaining)`,'warn');
+    } else {
+      notify('Hardened node — use BYPASS','err');return;
+    }
+  }
+  intR-=cost;updRes();
+  addLog('tlog',`$ exploit --auto ${n.service} [cost:${cost} INT]`,'tinfo');
+  if(['vuln','open','target','secure'].includes(n.status)){
+    n.status='done';
+    addLog('tlog',`SUCCESS: ${n.service} compromised`,'tok');
+    renderPuzzle();
+    const targets=['admin','rssh','classified'];
+    if(targets.includes(n.id)){setTimeout(puzzleDone,700);return;}
+  } else addLog('tlog','FAILED','terr');
+}
+
+function buildPuzzle(){
+  hackNodes=JSON.parse(JSON.stringify(MISSIONS[G.mission].nodes));
+  hackEdges=[];
+  MISSIONS[G.mission].nodes.forEach(n=>n.to.forEach(t=>hackEdges.push([n.id,t])));
+  selNode=null;
+  traceR=10+(G._ghostProtocol&&G.approach==='stealth'?3:0);
+  intR=G.int;focusR=G.stims*2+2;
+
+  // Backdoor perk: entry node pre-completed
+  if(G._backdoor){
+    const entry=hackNodes.find(n=>n.id==='entry');
+    if(entry){entry.status='done';addLog('tlog','BACKDOOR: entry node pre-compromised','tok');}
+  }
+
+  // Pattern Recognition perk: 1 random vuln node pre-revealed
+  if(G._freeNode){
+    const candidates=hackNodes.filter(n=>n.id!=='entry'&&n.id!=='admin'&&n.id!=='rssh'&&n.id!=='classified'&&n.status==='vuln');
+    if(candidates.length){
+      candidates[0].status='done';
+      addLog('tlog',`PATTERN RECOGNITION: ${candidates[0].service} auto-exploited`,'tok');
+    }
+  }
+
+  renderPuzzle();updRes();
+
+  // show tutorial on first puzzle
+  if(!G.story.puzzleTutorialSeen){
+    G.story.puzzleTutorialSeen=true;
+    runDialogue(PUZZLE_TUTORIAL_SCRIPT, ()=>{});
+  }
+}
+
+function launchDungeon(){
+  const m=MISSIONS[G.mission];
+  let enemySet=JSON.parse(JSON.stringify(m.enemies[G.approach||'loud']));
+  // Silent Operator perk: stealth gets -1 enemy (not below 1)
+  if(G._silentOp&&G.approach==='stealth'&&enemySet.length>1){
+    enemySet.splice(0,1);
+    addLog('tlog','SILENT OPERATOR: 1 fewer guard on stealth approach','tok');
+  }
+  G.rooms=enemySet;
+  G.roomIdx=0;G.roomRew=[];
+  G.php=Math.min(G.php,G.phmax); // don't overheal
+  $id('dtitle').textContent=m.dungeonTitle;
+  // Reset combat state
+  resetAllCooldowns();
+  guardActive=false;guardDurability=0;
+  document.getElementById('guard-wrap').style.display='none';
+  buildDots();loadRoom(0);
+  show('dungeon');
+}
+
+function buildDots(){
+  const el=$id('rdots');el.innerHTML='';
+  G.rooms.forEach((_,i)=>{
+    const d=document.createElement('div');
+    d.className='rd'+(i<G.roomIdx?' rddone':i===G.roomIdx?' rdcur':'');
+    el.appendChild(d);
+  });
+}
+
+function loadRoom(idx){
+  const e=G.rooms[idx];currentEnemy=e;
+  G.ehp=e.hp;G.ehmax=e.maxHp;
+  const isBoss=idx===G.rooms.length-1;
+  $id('espr').textContent=e.spr;
+  $id('ename').textContent=e.name;
+  updateBars();
+
+  const ec=$id('ecard');ec.style.display='flex';
+  let html=`<span class="ect">${e.name}</span><span class="eca">HP:${e.hp}</span><span class="eca">DMG:${e.dmg[0]}-${e.dmg[1]}</span>`;
+  if(isBoss)html+=`<span class="ecb">[BOSS]</span>`;
+  if(e.weak&&G.bossWeak)html+=`<span class="ecw">★ WEAKNESS: ${e.weak.toUpperCase()}</span>`;
+  if(e.note)html+=`<span style="color:var(--purple);font-style:italic">${e.note}</span>`;
+  ec.innerHTML=html;
+
+  const rlabels=['ENTRY CORRIDOR','INNER ROOM','CONTROL AREA','SERVER CORE','BOSS CHAMBER'];
+  const mods=[];
+  if(G.approach==='stealth')mods.push('<span class="mt mtg">STEALTH: reduced guards</span>');
+  if(G.approach==='loud')mods.push('<span class="mt mtr">LOUD ENTRY: all guards alert</span>');
+  if(G.approach==='exploit'&&G.bossWeak&&isBoss)mods.push('<span class="mt mta">EXPLOIT: boss mapped</span>');
+  if(e.note&&e.spr==='😱')mods.push('<span class="mt mtp">⚠ ANOMALY: not a guard</span>');
+  $id('rmods').innerHTML=`<b style="color:var(--txb)">${rlabels[Math.min(idx,4)]}</b> — ${idx+1}/${G.rooms.length} ${mods.join('')}`;
+
+  const sb=$id('bspecial');
+  sb.disabled=!(e.weak&&G.bossWeak);
+  sb.textContent=e.weak&&G.bossWeak?`EXPLOIT ${e.weak.toUpperCase()} WEAK`:'NO WEAKNESS';
+
+  // log intro narration if present
+  const clog=$id('clog');
+  clog.innerHTML='';
+  const mission=MISSIONS[G.mission];
+
+  // Ensure ticker is stopped during room load
+  stopEnemyTicker();
+
+  // Build narration scripts as dialogue overlays
+  let narrationScript=[];
+
+  // first room narration (backstory, why you can fight)
+  if(idx===0&&mission.roomNarration&&mission.roomNarration[0]){
+    mission.roomNarration[0].split('\n\n').forEach(line=>{
+      if(line.trim()) narrationScript.push({type:'narrate',text:line});
+    });
+  }
+
+  // boss intro — full cutscene overlay
+  if(isBoss&&e.intro){
+    narrationScript.push({type:'narrate',text:'<span style="color:var(--red);letter-spacing:4px;font-size:14px">— BOSS ENCOUNTER —</span>'});
+    e.intro.split('\n\n').forEach(line=>{
+      if(line.trim()) narrationScript.push({type:'narrate',text:line});
+    });
+  }
+
+  addLog('clog',`--- ${e.name} blocks your path ---`,'twarn');
+  buildDots();
+
+  if(narrationScript.length>0){
+    // play overlay FIRST, then start combat after player clicks through
+    runDialogue(narrationScript, ()=>{
+      setTimeout(startEnemyTicker, 800);
+    });
+  } else {
+    // no narration — start ticker after brief delay
+    setTimeout(startEnemyTicker, 1000);
+  }
+}
+
+function updateBars(){
+  const pp=Math.max(0,Math.round(G.php/G.phmax*100));
+  const ep=Math.max(0,Math.round(G.ehp/G.ehmax*100));
+  $id('php').style.width=pp+'%';$id('ehp').style.width=ep+'%';
+  $id('pht').textContent=Math.max(0,G.php)+'/'+G.phmax;
+  $id('eht').textContent=Math.max(0,G.ehp)+'/'+G.ehmax;
+}
+
+
+// ── REWARD ─────────────────────────────────────────────────────
+function showReward(){
+  const totM=G.roomRew.reduce((s,r)=>s+r.m,0);
+  const totC=G.roomRew.reduce((s,r)=>s+r.c,0);
+  const intG=G.approach==='exploit'?1:0;
+  const strG=G.approach==='loud'?1:0;
+  const repG=G.approach==='stealth'?3:2;
+  G.money+=totM;G.crypto+=totC;
+  G.int+=intG;G.str+=strG;G.rep+=repG;
+  G.missionsCleared++;G.filesFound++;
+  pendingLoreKey=G.mission;
+
+  // unlock next mission in chain
+  const unlockMsgs={
+    laundromat:'SYSTEM: Transaction logs flagged a warehouse on Portside. That\'s your next target.',
+    warehouse:'SYSTEM: Comms mention Vale Street Clinic. Someone is screening people there.',
+    clinic:'SYSTEM: Every record points to NEXAGEN BIOMETRICS. Time to go to the source.',
+    neon:null
+  };
+  if(G.mission==='laundromat') G.story.warehouseUnlocked=true;
+  if(G.mission==='warehouse')  G.story.clinicUnlocked=true;
+  if(G.mission==='clinic')     G.story.neonUnlocked=true;
+
+  const msgs={
+    stealth:'Clean operation. No traces left. Your handle is spreading in the right circles.',
+    loud:'You came in loud. Everyone knows now — friend and enemy alike.',
+    exploit:`Surgical. You mapped it before you touched it.${G.bossWeak?' Boss never stood a chance.':''}`
+  };
+  const warnings={
+    laundromat:'SYSTEM: Encrypted transaction log recovered. References to "subjects" and NEXAGEN BIOMETRICS.',
+    warehouse:'SYSTEM: Comms fragment recovered. VIPER is delivering people somewhere. NEXAGEN is paying.',
+    clinic:'SYSTEM: Patient database recovered. People are being screened here. Transferred without consent.',
+    neon:'SYSTEM: PROGRAM VECTOR files recovered. Now you know what the monsters are. And why you were chosen.'
+  };
+
+  $id('rsub').textContent=MISSIONS[G.mission].name+' — CLEARED';
+  $id('rpath').innerHTML=`<span style="color:var(--green)">// APPROACH: ${G.approach.toUpperCase()}</span><br>${msgs[G.approach]}<br><br><span style="color:var(--purple)">${warnings[G.mission]}</span>`;
+
+  const ld=$id('lore-drop');
+  ld.style.display='block';
+  $id('lore-drop-preview').textContent='Encrypted file recovered from '+MISSIONS[G.mission].name+'. Click to decrypt and read.';
+
+  const items=$id('ritems');items.innerHTML='';
+  [{ico:'💵',name:'CASH',val:'+$'+totM,cls:'ria'},{ico:'◆',name:'CRYPTO',val:'+◆'+totC,cls:'rib'},{ico:'📊',name:'STATS',val:(intG?'+'+intG+' INT ':'')+' +'+repG+' REP'+(strG?' +'+strG+' STR':''),cls:'rig'}]
+  .forEach(r=>{
+    const el=document.createElement('div');el.className='ritem';
+    el.innerHTML=`<div class="riico">${r.ico}</div><div class="riname">${r.name}</div><div class="rival ${r.cls}">${r.val}</div>`;
+    items.appendChild(el);
+  });
+  updateHUD();show('reward');
+
+  // post-clear story notifications
+  const unlockMsg=unlockMsgs[G.mission];
+  if(unlockMsg) setTimeout(()=>notify(unlockMsg,'lore'),1400);
+  if(G.mission==='neon') setTimeout(()=>notify('ACT 1 COMPLETE — Something has changed in the network.','lore'),1500);
+}
+</script>
+</body>
+</html>
