@@ -154,6 +154,15 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 .rdcur{background:rgba(255,170,0,0.2);border-color:var(--amber);}
 
 .arena{background:var(--bg2);border:1px solid var(--brd);border-radius:2px;padding:16px;margin-bottom:10px;}
+.arena.shake{animation:camShake 0.38s linear;}
+@keyframes camShake{
+  0%{transform:translate(0,0);}
+  20%{transform:translate(-4px,2px);}
+  40%{transform:translate(4px,-3px);}
+  60%{transform:translate(-3px,-2px);}
+  80%{transform:translate(3px,2px);}
+  100%{transform:translate(0,0);}
+}
 .fighters{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px;}
 .fbox{width:43%;}
 .fname{font-size:10px;color:var(--txd);letter-spacing:1px;margin-bottom:5px;}
@@ -402,8 +411,14 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
     <div class="card" id="clinic-card" onclick="selectMission('clinic')">
       <div class="card-icon">🏥</div>
       <div class="card-name">VALE STREET CLINIC</div>
-      <div class="card-desc" id="clinic-desc">Clear the warehouse first. The logs point here next.</div>
+      <div class="card-desc" id="clinic-desc">Clear the warehouse, then complete the mini-quest lead chain.</div>
       <span class="badge br" id="clinic-badge">LOCKED</span>
+    </div>
+    <div class="card" id="miniquest-card" onclick="goMiniQuest()">
+      <div class="card-icon">🧭</div>
+      <div class="card-name">SIDE LEAD: COLD TRAIL</div>
+      <div class="card-desc" id="miniquest-desc">Locked. Beat PORTSIDE WAREHOUSE to unlock this lead.</div>
+      <span class="badge br" id="miniquest-badge">LOCKED</span>
     </div>
     <div class="card" id="neoncard" onclick="selectMission('neon')">
       <div class="card-icon">🔬</div>
@@ -642,6 +657,20 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
   <button class="btn" onclick="showCity()">[ BACK TO MAP ]</button>
 </div>
 
+<!-- MINI QUEST -->
+<div id="miniquest" class="screen">
+  <div class="stitle">// SIDE LEAD — COLD TRAIL</div>
+  <div class="brief">
+    <h4>POST-WAREHOUSE LEAD</h4>
+    <p id="miniquest-brief">VIPER's shipment ledger points to a clinic courier node that rotates encryption every six hours. Track, decode, and intercept the route to unlock the next dungeon.</p>
+  </div>
+  <div class="panel">
+    <div class="phdr">OBJECTIVES (TRAIN + STUDY INCENTIVE)</div>
+    <div class="pbody" id="miniquest-objectives"></div>
+  </div>
+  <button class="btn" onclick="showCity()">[ BACK TO MAP ]</button>
+</div>
+
 </div>
 
 <script>
@@ -664,6 +693,11 @@ const G={
     neonUnlocked:false,
     collegeVisited:false,
     puzzleTutorialSeen:false,
+    miniQuestUnlocked:false,
+    miniQuestCompleted:false,
+    mqIntelDone:false,
+    mqCombatDone:false,
+    mqRelayDone:false,
   }
 };
 
@@ -737,6 +771,7 @@ function dlgRender(){
       btn.textContent=c.text;
       btn.onclick=()=>{
         if(c.flag)G.story[c.flag]=true;
+        if(c.onChoose)c.onChoose();
         if(typeof c.next==='number'){dlgIdx=c.next;dlgRender();}
         else dlgNext();
       };
@@ -962,7 +997,23 @@ const MISSIONS={
       stealth:[
         {name:'PATROL DRONE',hp:35,maxHp:35,spr:'🤖',dmg:[8,13],weak:'exploit',rew:{m:110,c:45}},
         {name:'GANG GRUNT',hp:65,maxHp:65,spr:'😤',dmg:[11,17],weak:null,rew:{m:125,c:42}},
-        {name:'BOSS: VIPER',hp:110,maxHp:110,spr:'🐍',dmg:[14,21],weak:'exploit',rew:{m:265,c:110}},
+        {name:'BOSS: VIPER',hp:110,maxHp:110,spr:'🐍',dmg:[14,21],weak:'exploit',rew:{m:265,c:110},
+         phase2:{
+           name:'BOSS: VIPER // OVERCLOCKED',
+           hp:85,maxHp:85,spr:'🦂',dmg:[18,26],weak:'exploit',
+           note:'Neural mesh overclocked. Attacks come faster and harder.',
+           puzzle:{
+             question:'VIPER reroutes his neural mesh through three live relay channels. Which one is the real control stream?',
+             options:[
+               {text:'CHANNEL B — "steady heartbeat, jitter spikes" (correct)', correct:true},
+               {text:'CHANNEL A — "highest bandwidth, clean signal"', correct:false},
+               {text:'CHANNEL C — "packet flood, randomized timing"', correct:false},
+             ],
+             success:'You found the real stream and inject a sabotage packet. VIPER staggers. Phase 2 starts weakened.',
+             fail:'False stream. Decoy loop. VIPER slams you while ROOTKIT recalibrates.'
+           }
+         }
+        },
       ],
       loud:[
         {name:'GUARD DOG',hp:50,maxHp:50,spr:'🐕',dmg:[12,18],weak:null,rew:{m:85,c:20}},
@@ -1076,10 +1127,10 @@ function updateHUD(){
       lockedDesc:'Clear the laundromat first. Something bigger is running through there.'
     },
     {
-      id:'clinic', unlocked:G.story.clinicUnlocked,
+      id:'clinic', unlocked:G.story.clinicUnlocked&&G.story.miniQuestCompleted,
       label:'MISSION 3', cls:'bg',
-      unlockedDesc:'Walk-in clinic on Vale. Corrupted patient records. The warehouse comms mention this place.',
-      lockedDesc:'Clear the warehouse first. The logs point here next.'
+      unlockedDesc:'Walk-in clinic on Vale. Lead confirmed from your courier side op.',
+      lockedDesc:'Clear warehouse + complete SIDE LEAD: COLD TRAIL.'
     },
     {
       id:'neon', unlocked:G.story.neonUnlocked,
@@ -1103,6 +1154,22 @@ function updateHUD(){
       if(card)card.style.opacity='0.5';
     }
   });
+  const mqCard=$id('miniquest-card'),mqBadge=$id('miniquest-badge'),mqDesc=$id('miniquest-desc');
+  if(mqCard&&mqBadge&&mqDesc){
+    if(G.story.miniQuestCompleted){
+      mqBadge.textContent='COMPLETE';mqBadge.className='badge bg';
+      mqDesc.textContent='Courier lead cracked. Clinic ingress path confirmed.';
+      mqCard.style.opacity='1';
+    } else if(G.story.miniQuestUnlocked){
+      mqBadge.textContent='SIDE QUEST';mqBadge.className='badge ba';
+      mqDesc.textContent='Decrypt courier route + prove yourself (INT/STR checks). Unlocks Clinic.';
+      mqCard.style.opacity='1';
+    } else {
+      mqBadge.textContent='LOCKED';mqBadge.className='badge br';
+      mqDesc.textContent='Locked. Beat PORTSIDE WAREHOUSE to unlock this lead.';
+      mqCard.style.opacity='0.5';
+    }
+  }
 }
 
 function notify(msg,type=''){
@@ -1213,7 +1280,10 @@ function selectMission(id){
     notify('INT 6+ required for warehouse approach.','err');return;
   }
   if(id==='clinic'&&!G.story.clinicUnlocked){
-    notify('Clear the warehouse first — the logs point there next.','warn');return;
+    notify('Clear warehouse and complete SIDE LEAD: COLD TRAIL first.','warn');return;
+  }
+  if(id==='clinic'&& !G.story.miniQuestCompleted){
+    notify('Clinic is locked. Finish SIDE LEAD: COLD TRAIL.','warn');return;
   }
   if(id==='neon'&&!G.story.neonUnlocked){
     notify('Clear the clinic first — every thread leads to Nexagen.','warn');return;
@@ -1619,8 +1689,13 @@ function playerAtk(dmg,label){
   const cls=isCrit?'tcrit':'tok';
   const prefix=isCrit?'★ CRITICAL — ':'';
   addLog('clog',`${prefix}YOU → ${label}: ${dmg} dmg${isCrit?' !!':''}`  ,cls);
+  if(isCrit)triggerArenaShake();
   updateBars();
   if(G.ehp<=0){
+    if(currentEnemy&&currentEnemy.phase2&&!currentEnemy._phase2Triggered){
+      triggerBossPhaseShift();
+      return;
+    }
     stopEnemyTicker();
     addLog('clog',`${currentEnemy.name} GOES DOWN.`,'tcrit');
     setTimeout(roomWin,600);
@@ -1651,10 +1726,72 @@ function enemyAtk(){
     const isHeavy=dmg>=e.dmg[1]-1;
     const cls=isHeavy?'tbighit':'terr';
     addLog('clog',`${isHeavy?'★ ':''}${e.name} hits you for ${dmg}${isHeavy?' — HEAVY HIT':''}`,cls);
+    if(isHeavy)triggerArenaShake();
   }
   G.php=Math.max(0,G.php-dmg);
   updateBars();
   if(G.php<=0){stopEnemyTicker();setTimeout(playerDie,500);}
+}
+
+function triggerArenaShake(){
+  const arena=document.querySelector('.arena');
+  if(!arena)return;
+  arena.classList.remove('shake');
+  void arena.offsetWidth;
+  arena.classList.add('shake');
+  setTimeout(()=>arena.classList.remove('shake'),380);
+}
+
+function triggerBossPhaseShift(){
+  stopEnemyTicker();
+  currentEnemy._phase2Triggered=true;
+  const pz=currentEnemy.phase2?.puzzle;
+  if(!pz){setPhaseTwoEnemy();return;}
+  triggerArenaShake();
+  const script=[
+    {type:'narrate',text:'<span style="color:var(--red);letter-spacing:4px;font-size:14px">PHASE SHIFT — VIPER OVERRIDES SAFETY LIMITERS</span>'},
+    {type:'narrate',text:'VIPER rips the injector from his neck and jams it back in. His hands stop shaking. His breathing doesn’t.'},
+    {type:'choice',speaker:'SYSTEM://ROOTKIT',avatar:'⚡',side:'other',text:pz.question,
+      choices:pz.options.map((o)=>({
+        text:o.text,
+        onChoose:()=>{
+          if(o.correct){
+            G._warehousePuzzleSolved=true;
+            addLog('clog',pz.success,'tok');
+          } else {
+            G._warehousePuzzleSolved=false;
+            const backlash=Math.min(18,Math.max(10,Math.floor(G.phmax*0.12)));
+            G.php=Math.max(1,G.php-backlash);
+            addLog('clog',`${pz.fail} (-${backlash} HP)`,'terr');
+            updateBars();
+          }
+        }
+      }))
+    }
+  ];
+  runDialogue(script, ()=>{
+    setPhaseTwoEnemy();
+  });
+}
+
+function setPhaseTwoEnemy(){
+  const p2=currentEnemy.phase2;
+  if(!p2)return;
+  currentEnemy={
+    ...currentEnemy,
+    name:p2.name,
+    hp:p2.hp,maxHp:p2.maxHp,spr:p2.spr,dmg:p2.dmg,weak:p2.weak,note:p2.note,
+    phase2:null
+  };
+  G.ehmax=p2.maxHp;
+  const phaseHp=G._warehousePuzzleSolved?Math.round(p2.hp*0.72):p2.hp;
+  G.ehp=phaseHp;
+  addLog('clog','PHASE 2 ENGAGED','tcrit');
+  if(G._warehousePuzzleSolved)addLog('clog','ROOTKIT sabotage active: Phase 2 HP reduced.','tok');
+  $id('espr').textContent=currentEnemy.spr;
+  $id('ename').textContent=currentEnemy.name;
+  updateBars();
+  setTimeout(startEnemyTicker,850);
 }
 
 function playerDie(){
@@ -1769,6 +1906,81 @@ function withdrawQuick(pct){
 // ── BLACK MARKET ───────────────────────────────────────────────
 function goMarket(){
   renderMarket();show('market');
+}
+
+function goMiniQuest(){
+  if(!G.story.miniQuestUnlocked){
+    notify('This lead unlocks after the warehouse mission.','warn');
+    return;
+  }
+  renderMiniQuest();
+  show('miniquest');
+}
+
+function renderMiniQuest(){
+  const done=(ok)=>ok?'<span style="color:var(--green)">✓ COMPLETE</span>':'<span style="color:var(--amber)">PENDING</span>';
+  const el=$id('miniquest-objectives');
+  el.innerHTML=`
+    <div style="display:grid;gap:10px">
+      <div class="card" style="cursor:default">
+        <div class="card-name">1) Decode the courier cipher (INT 7)</div>
+        <div class="card-desc">Study incentive: raise INT through terminal/classes to crack rotating relay keys.</div>
+        <div style="margin-top:8px;font-size:10px">${done(G.story.mqIntelDone)}</div>
+        ${G.story.mqIntelDone?'':`<button class="btn" style="margin-top:8px" onclick="doMiniQuestStep('intel')">[ ATTEMPT DECRYPT ]</button>`}
+      </div>
+      <div class="card" style="cursor:default">
+        <div class="card-name">2) Intercept courier escort (STR 6)</div>
+        <div class="card-desc">Training incentive: boost STR at gym/dojo so you can survive the handoff scramble.</div>
+        <div style="margin-top:8px;font-size:10px">${done(G.story.mqCombatDone)}</div>
+        ${G.story.mqCombatDone?'':`<button class="btn red" style="margin-top:8px" onclick="doMiniQuestStep('combat')">[ INTERCEPT ]</button>`}
+      </div>
+      <div class="card" style="cursor:default">
+        <div class="card-name">3) Relay spoof insertion ($60 or ◆30)</div>
+        <div class="card-desc">Pay an informant and plant a fake route. Unlocks direct ingress to Vale Clinic.</div>
+        <div style="margin-top:8px;font-size:10px">${done(G.story.mqRelayDone)}</div>
+        ${G.story.mqRelayDone?'':`<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn amb" onclick="doMiniQuestStep('relay_cash')">[ PAY $60 ]</button>
+            <button class="btn pur" onclick="doMiniQuestStep('relay_crypto')">[ PAY ◆30 ]</button>
+          </div>`}
+      </div>
+    </div>`;
+}
+
+function doMiniQuestStep(step){
+  if(step==='intel'){
+    if(G.int<7){notify('INT 7 required. Study more first.','err');return;}
+    G.story.mqIntelDone=true;G.rep+=2;
+    notify('Cipher cracked. +2 REP','lore');
+  }
+  if(step==='combat'){
+    if(G.str<6){notify('STR 6 required. Train more first.','err');return;}
+    G.story.mqCombatDone=true;G.money+=90;
+    notify('Courier intercepted. +$90','');
+  }
+  if(step==='relay_cash'){
+    if(G.money<60){notify('Need $60','err');return;}
+    G.money-=60;G.story.mqRelayDone=true;
+    notify('Informant paid. Relay route poisoned.','warn');
+  }
+  if(step==='relay_crypto'){
+    if(G.crypto<30){notify('Need ◆30','err');return;}
+    G.crypto-=30;G.story.mqRelayDone=true;
+    notify('Crypto transfer confirmed. Relay route poisoned.','warn');
+  }
+
+  if(G.story.mqIntelDone&&G.story.mqCombatDone&&G.story.mqRelayDone&&!G.story.miniQuestCompleted){
+    G.story.miniQuestCompleted=true;
+    G.story.clinicUnlocked=true;
+    G.rep+=4;G.int+=1;
+    runDialogue([
+      {type:'narrate',text:'The forged relay seed propagates across the courier mesh. One destination remains stable: <span style="color:var(--amber)">VALE STREET CLINIC</span>.'},
+      {type:'narrate',text:'After VIPER, you expected muscle. Instead, this is cleaner. More deliberate. Whoever runs the clinic hides behind process, not brute force.'},
+      {type:'system',text:'SIDE QUEST COMPLETE — COLD TRAIL<br><br>CLINIC DUNGEON UNLOCKED<br>Bonus: +1 INT, +4 REP'}
+    ],()=>{});
+  }
+
+  renderMiniQuest();
+  updateHUD();
 }
 
 function renderMarket(){
@@ -1991,12 +2203,12 @@ function showReward(){
   // unlock next mission in chain
   const unlockMsgs={
     laundromat:'SYSTEM: Transaction logs flagged a warehouse on Portside. That\'s your next target.',
-    warehouse:'SYSTEM: Comms mention Vale Street Clinic. Someone is screening people there.',
+    warehouse:'SYSTEM: Comms mention Vale Street Clinic. New side lead unlocked: COLD TRAIL.',
     clinic:'SYSTEM: Every record points to NEXAGEN BIOMETRICS. Time to go to the source.',
     neon:null
   };
   if(G.mission==='laundromat') G.story.warehouseUnlocked=true;
-  if(G.mission==='warehouse')  G.story.clinicUnlocked=true;
+  if(G.mission==='warehouse')  G.story.miniQuestUnlocked=true;
   if(G.mission==='clinic')     G.story.neonUnlocked=true;
 
   const msgs={
